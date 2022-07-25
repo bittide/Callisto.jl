@@ -1,5 +1,6 @@
 # Callisto module
 
+Welcome to Callisto!
 
 ```@contents
 ```
