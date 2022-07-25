@@ -5,7 +5,7 @@ using Callisto
 makedocs(sitename="Callisto Documentation")
 
 
-deploydocs(repo = "github.com/bittide/Callisto.jl.git",)
+deploydocs(versions=nothing, repo = "github.com/bittide/Callisto.jl.git",)
 
 
 
