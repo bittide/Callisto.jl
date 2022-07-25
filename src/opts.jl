@@ -15,6 +15,11 @@ import ..SimCore: Error
 # These links are unidirectional
 # from the head of the elastic buffer at src
 # to the head of the elastic buffer at dst
+
+"""
+   Link structure
+
+"""
 struct Link
     id
     src
@@ -26,7 +31,10 @@ struct Link
     offset
 end
 
+"""
+    CalOpts structure
 
+"""
 mutable struct CalOpts
     graph
     links
@@ -111,8 +119,13 @@ end
 
 # map 2m length vector to 2 m-length vectors
 
+"""
+    make_ugn()
 
-function make_nzero(n, m, edges, beta0, theta0, latency, wm2, gears)
+n = 1
+
+"""
+function make_ugn(n, m, edges, beta0, theta0, latency, wm2, gears)
     nzero = zeros(m)
     for e = 1:m
         src, dst = edges[e]
@@ -129,7 +142,15 @@ end
 
 
     
+"""
+    CalOpts(;)
 
+Return a CalOpts structure. Keyword arguments are:
+
+   graph
+   latency
+  
+"""
 function CalOpts(;topology = ("mesh", 3, 2), graph = nothing,
                  kp = 2e-8, ki = 1e-15, tmax = 1e9,
                  latency=5000, seed=1, theta0=0.1,
@@ -205,7 +226,7 @@ function CalOpts(;topology = ("mesh", 3, 2), graph = nothing,
         gears = ones(g.m)
     end
     
-    nzero = make_nzero(g.n, g.m, g.edges, beta0, theta0, latency, wm2, gears)
+    nzero = make_ugn(g.n, g.m, g.edges, beta0, theta0, latency, wm2, gears)
 
     links = []
     for i = 1:g.m
@@ -257,40 +278,40 @@ function CalOpts(;topology = ("mesh", 3, 2), graph = nothing,
     return c
 end
 
-
-function nscale(x)
-    s = repr(x)
-    if 'e' in s
-        s = "\\texttt{$s}"
-    end
-    return s
-end
-
-function xprintln(c::CalOpts)
-    topology = c.graph.topology
-    if topology[1] == "full" && topology[2] == 2
-        s = "2 nodes"
-    elseif topology[1] == "full" && topology[2] == 3
-        s = "triangle"
-    else
-        s = topology[1] * "(" * join(string.(topology[2:end]),", ") *")"
-    end
-    println("\\item topology: $s")
-    println("\\item \$k_P =  $(nscale(c.kp))\$,  \$k_I = $(nscale(c.ki))\$")
-
-    n = c.graph.n
-    latency = c.links[1].latency
-    # warning: assumes uniform latency
-    println("\\item \$\\codestyle{latency} = $(latency)\$")
-
-    println("\\item \$\\codestyle{poll\\_period} = $(c.poll_period)\$")
-
-    #s = "(" * join(repr.(c.errors), ", ") * ")"
-    #println("\\item \$\\codestyle{uncorrected_frequency} = $s\$")
-    println("\\item \$\\codestyle{control\\_delay} = $(c.control_delay)\$")
-    println("\\item \$\\codestyle{theta0} = $(c.theta0)\$")
-end
-
+# 
+# function nscale(x)
+#     s = repr(x)
+#     if 'e' in s
+#         s = "\\texttt{$s}"
+#     end
+#     return s
+# end
+# 
+# function xprintln(c::CalOpts)
+#     topology = c.graph.topology
+#     if topology[1] == "full" && topology[2] == 2
+#         s = "2 nodes"
+#     elseif topology[1] == "full" && topology[2] == 3
+#         s = "triangle"
+#     else
+#         s = topology[1] * "(" * join(string.(topology[2:end]),", ") *")"
+#     end
+#     println("\\item topology: $s")
+#     println("\\item \$k_P =  $(nscale(c.kp))\$,  \$k_I = $(nscale(c.ki))\$")
+# 
+#     n = c.graph.n
+#     latency = c.links[1].latency
+#     # warning: assumes uniform latency
+#     println("\\item \$\\codestyle{latency} = $(latency)\$")
+# 
+#     println("\\item \$\\codestyle{poll\\_period} = $(c.poll_period)\$")
+# 
+#     #s = "(" * join(repr.(c.errors), ", ") * ")"
+#     #println("\\item \$\\codestyle{uncorrected_frequency} = $s\$")
+#     println("\\item \$\\codestyle{control\\_delay} = $(c.control_delay)\$")
+#     println("\\item \$\\codestyle{theta0} = $(c.theta0)\$")
+# end
+# 
 
 
 
