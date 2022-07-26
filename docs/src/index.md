@@ -2,9 +2,7 @@
 
 Welcome to Callisto!
 
-The callisto [source-code].
-
-[source-code]: https://github.com/bittide/Callisto.jl
+The callisto [source-code](https://github.com/bittide/Callisto.jl).
 
 
 ```@contents
