@@ -65,7 +65,7 @@ end
 # note controller cannot exactly implement PI, since it does not know t
 function Cx(i, y, controller_states, controller_next, slog)
     llog(slog, 7, sum_or_missing(a[2] for a in y))
-    llog(slog, 8, controller_states[i])
+    llog(slog, 8, controller_states[i][1])
 #    cs = controller_states[i]
     controller_states[i], corr = controller_next(i, controller_states[i], y)
 #    println((;corr,cs))

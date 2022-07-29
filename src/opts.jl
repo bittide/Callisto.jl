@@ -157,6 +157,7 @@ function CalOpts(;topology = ("mesh", 3, 2), graph = nothing,
                  poll_period = 1e5,
                  control_delay = 1000,
                  bidirectional = true,
+                 base_freq = 1,
                  wmin = 0.1,
                  wm1 = nothing, wm2 = nothing,
                  controller_init = nothing, controller_next = nothing,
@@ -248,7 +249,7 @@ function CalOpts(;topology = ("mesh", 3, 2), graph = nothing,
             return 0,0
         end
         s = sum(a[2] for a in ml)
-        next_state =  xi + poll_period*s
+        next_state =  xi + poll_period*s/base_freq
         correction =  kp * s +  ki * next_state
         return next_state, correction
     end
