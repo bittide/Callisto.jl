@@ -46,12 +46,7 @@ function Gx(i, theta, s, theta0, p, links, incoming, d, slog)
 
     llog(slog, 2, k)
     llog(slog, 5, t)
-
     y = [ (e, meas(links[e], t, theta), t) for e in incoming[i]]
-
-    # debug
-    # measx = sum_or_missing(a[2] for a in y)
-    # println((;t,measx))
     return y
 end
 
@@ -66,10 +61,7 @@ end
 function Cx(i, y, controller_states, controller_next, slog)
     llog(slog, 7, sum_or_missing(a[2] for a in y))
     llog(slog, 8, controller_states[i][1])
-#    cs = controller_states[i]
     controller_states[i], corr = controller_next(i, controller_states[i], y)
-#    println((;corr,cs))
-#    println("---------------------------------")
     return corr
 end
 
@@ -112,7 +104,6 @@ function callisto(tmax, epoch, num_nodes,
     initial_state(i) = initial_statex(i, epoch, freq_m2[i], freq_m1[i], theta0[i], d, slog)
     G(i, theta, s)   = Gx(i, theta, s, theta0, p, links, incoming, d, slog)
     C(i, y)          = Cx(i, y, controller_states, controller_next, slog)
-    #F(i, theta, c)   = Fx(i, theta, c, errors, p)
     F(i, theta, ds)   = Fx(i, theta, ds, p)
 
     theta = [initial_state(i) for i=1:num_nodes]
@@ -123,10 +114,6 @@ function callisto(tmax, epoch, num_nodes,
         y = G(i, theta, s)
         c = C(i, y)
         ds = local_to_realtime(errors[i], p, c, s, wmin)
-        #clog(slog, theta[i].x[end], i, c + errors[i])
-        #
-        # p/ds is average frequency over the next period
-        #clog(slog, theta[i].x[end], i, p/ds)
         clog(slog, theta[i].x[end], i, c + errors[i](s))
         @assert c + errors[i](s) > 0
         F(i, theta, ds)
@@ -138,8 +125,7 @@ end
 function callisto(c)
     print("Running callisto: ")
 
-    # really callisto cares about only the incoming
-    # edges to each node
+    # callisto cares about only the incoming edges to each node
     @time simlog, theta = callisto(c.tmax,
                                    c.epoch,
                                    c.graph.n,
