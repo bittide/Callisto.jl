@@ -86,12 +86,8 @@ function initial_statex(i, epoch, freq_m2, freq_m1, theta0, d, slog)
 end
 
 
-function callisto(tmax, epoch, num_nodes,
-                  links,
-                  incoming, p, d, errors,
-                  theta0, 
-                  freq_m2, freq_m1, wmin,
-                  controller_init, controller_next)
+function callisto(tmax, epoch, num_nodes, links, incoming, p, d, errors,
+                  theta0, freq_m2, freq_m1, wmin, controller_init, controller_next)
 
     @assert d < p
     if tmax/p < 10

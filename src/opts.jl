@@ -119,20 +119,11 @@ end
 
 # map 2m length vector to 2 m-length vectors
 
-"""
-    make_ugn()
 
-n = 1
-
-"""
-function make_ugn(n, m, edges, beta0, theta0, latency, wm2, gears)
-    nzero = zeros(m)
-    for e = 1:m
-        src, dst = edges[e]
-        nzero[e] = beta0[e] - floor(gears[e]*(theta0[src] - latency[e] * wm2[src])) + floor(gears[e]*theta0[dst]) 
-    end
-    return nzero
+function ugn(beta0, gear, latency, theta0_at_src,  wm2_at_src, theta0_at_dst)
+    return beta0 - floor(gear*(theta0_at_src - latency * wm2_at_src)) + floor(gear*theta0_at_dst)
 end
+
 
 function make_frequencies(seed, num_nodes)
     rng = Random.Xoshiro(seed)
@@ -226,16 +217,18 @@ function CalOpts(;topology = ("mesh", 3, 2), graph = nothing,
     if isnothing(gears)
         gears = ones(g.m)
     end
-    
-    nzero = make_ugn(g.n, g.m, g.edges, beta0, theta0, latency, wm2, gears)
 
-    links = []
-    for i = 1:g.m
-        src, dst = g.edges[i]
-        push!(links, Link(i, src, dst, nzero[i], latency[i], gears[i],
-                          beta0[i], measurement_offsets[i]))
+    function make_link(e)
+        return Link(e, g.edges[e].src, g.edges[e].dst,
+                    ugn(beta0[e], gears[e], latency[e], theta0[g.edges[e].src],
+                        wm2[g.edges[e].src], theta0[g.edges[e].dst]),
+                    latency[e],
+                    gears[e],
+                    beta0[e],
+                    measurement_offsets[e])
     end
 
+    links = [make_link(e) for e = 1:g.m]
     
     if isnothing(controller_init)
         controller_init = () -> 0.0
