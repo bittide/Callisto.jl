@@ -24,7 +24,7 @@ struct Link
     id
     src
     dst
-    nzero
+    ugn
     latency
     gear
     beta0
@@ -120,7 +120,7 @@ end
 # map 2m length vector to 2 m-length vectors
 
 
-function ugn(beta0, gear, latency, theta0_at_src,  wm2_at_src, theta0_at_dst)
+function make_ugn(beta0, gear, latency, theta0_at_src,  wm2_at_src, theta0_at_dst)
     return beta0 - floor(gear*(theta0_at_src - latency * wm2_at_src)) + floor(gear*theta0_at_dst)
 end
 
@@ -220,7 +220,7 @@ function CalOpts(;topology = ("mesh", 3, 2), graph = nothing,
 
     function make_link(e)
         return Link(e, g.edges[e].src, g.edges[e].dst,
-                    ugn(beta0[e], gears[e], latency[e], theta0[g.edges[e].src],
+                    make_ugn(beta0[e], gears[e], latency[e], theta0[g.edges[e].src],
                         wm2[g.edges[e].src], theta0[g.edges[e].dst]),
                     latency[e],
                     gears[e],

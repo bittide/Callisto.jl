@@ -31,7 +31,7 @@ function get_occ_samples(c, theta, times)
         mo = zeros(length(times))
         for r = 1:length(times)
             t = times[r]
-            mo[r] =  beta(dst, src, e, t, theta, c.nzero, c.latency, c.gears)
+            mo[r] =  beta(dst, src, e, t, theta, c.ugn, c.latency, c.gears)
         end
         occ[e] = Samples(times, mo)
     end
@@ -98,7 +98,7 @@ function get_delta(c, theta)
     delta = Array{Union{Missing, PiecewiseLinear}, 2}(missing, n, n)
     for i=1:n
         for j in c.graph.adjacent_nodes[i]
-            delta[i,j] = delay(theta[j], c.latency[i,j]) - theta[i] + c.nzero[i,j]
+            delta[i,j] = delay(theta[j], c.latency[i,j]) - theta[i] + c.ugn[i,j]
         end
     end
     return delta
@@ -112,7 +112,7 @@ function beta_piecewise(c, link, theta, tmin, tmax)
     thj = before(after(thj1, tmin), tmax)
     thi = before(after(theta[link.dst], tmin), tmax)
     p = floor(link.gear*thj) - floor(link.gear*thi)
-    return p + link.nzero
+    return p + link.ugn
 end
 
 function get_adjusted_theta(c, theta,  tmin, tmax)

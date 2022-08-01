@@ -40,7 +40,7 @@ end
 
 ##############################################################################
 module SimCore
-beta((;nzero, src, dst, latency, gear), t, theta) = nzero + floor(gear*theta[src](t - latency)) - floor(gear*theta[dst](t))
+beta((;ugn, src, dst, latency, gear), t, theta) = ugn + floor(gear*theta[src](t - latency)) - floor(gear*theta[dst](t))
 
 
 struct ConstError
@@ -58,7 +58,7 @@ struct Link
     id
     src
     dst
-    nzero
+    ugn
     latency
     gear
     beta0
@@ -73,8 +73,8 @@ include("../src/sim.jl")
 using .Sim
 
 function makelink(e, src, dst, beta0, theta0, latency, wm2, gear)
-    nzero = beta0 - floor(gear*(theta0[src] - latency * wm2[src])) + floor(gear*theta0[dst])
-    return Link(e, src, dst, nzero, latency, gear, beta0, beta0)
+    ugn = beta0 - floor(gear*(theta0[src] - latency * wm2[src])) + floor(gear*theta0[dst])
+    return Link(e, src, dst, ugn, latency, gear, beta0, beta0)
 end
 
 function get_incoming_edges(edges, n)

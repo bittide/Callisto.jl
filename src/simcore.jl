@@ -51,7 +51,7 @@ function local_to_realtime(e::PwlError, p, c, s, wmin)
 end
 
 
-beta((;nzero, src, dst, latency, gear), t, theta) = nzero + floor(gear*theta[src](t - latency)) - floor(gear*theta[dst](t))
+beta((;ugn, src, dst, latency, gear), t, theta) = ugn + floor(gear*theta[src](t - latency)) - floor(gear*theta[dst](t))
 
 
 
