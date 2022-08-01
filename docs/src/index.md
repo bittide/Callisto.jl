@@ -11,8 +11,16 @@ the bittide mechanism is available in the papers:
   * S. Lall, C. Cascaval, M. Izzard and T. Spalink. Resistance Distance and	Control Performance for bittide Synchronization. Proceedings of the European Control Conference, 2022. [arXiv:2111.05296](https://arxiv.org/abs/2111.05296)
 
 The model and algorithm used by Callisto follows closely that described in the
-first of these papers. The [code](https://github.com/bittide/Callisto.jl)
-is open-source.
+first of these papers. 
+
+## Resources
+
+* The [source code for Callisto](https://github.com/bittide/Callisto.jl)
+* The [documentation](https://www.bittide.io/Callisto.jl/)
+* The [CallistoVisualization package](https://github.com/bittide/CallistoVisualization.jl)
+* The [PlotKit package](https://github.com/bittide/PlotKit.jl)
+
+
 
 ## Installation 
 
