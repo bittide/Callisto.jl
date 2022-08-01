@@ -234,16 +234,16 @@ function CalOpts(;topology = ("mesh", 3, 2), graph = nothing,
         controller_init = () -> 0.0
     end
 
-    function cnext(i, xi, ml)
-        if length(ml) == 0
+    function cnext(i, xi, measurement)
+        if length(measurement) == 0
             # can have no measurements if
             # there are no incoming edges at a node
             # and hence no elastic buffers
             return 0,0
         end
-        s = sum(a[2] for a in ml)
-        next_state =  xi + poll_period*s/base_freq
-        correction =  kp * s +  ki * next_state
+        r = sum(a[2] for a in measurement)
+        next_state =  xi + poll_period*r/base_freq
+        correction =  kp * r +  ki * next_state
         return next_state, correction
     end
     
