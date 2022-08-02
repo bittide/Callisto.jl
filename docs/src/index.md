@@ -53,6 +53,34 @@ julia> save(drawplot(pzip.(xc.freq)), "frequency.png")
 This will save a plot of the frequency against time in the file `frequency.png` in 
 the Julia working directory.
 
+## Common options
+
+
+```julia
+julia> c = CalOpts(; kwargs...)
+```
+
+`CalOpts` takes a number of optional keyword arguments. These include
+
+- `topology`: a tuple, whose first entry is the string name, and remaining
+   entries are numerical parameters. For example,
+     + `("triangle")`
+     + `("mesh", 3, 4)`
+     + `("line", 6)`
+- `kp`: proportional gain
+- `ki`: integral gain
+- `latency`: either a number, in which case it is the latency of every link,
+   or a list, whose `i`th entry is the latency of the `i`th link
+- `tmax`: simulation end time
+- `poll_period`: the delay, in localticks, between successive control updates
+- `control_delay`: the delay, in localticks, at a node between making a measurement
+   and the frequency update
+   
+   
+   
+
+
+
 
 
 

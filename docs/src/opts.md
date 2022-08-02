@@ -10,7 +10,7 @@ CurrentModule = Callisto.Opts
 Link
 CalOpts
 CalOpts()
-make_ugn(n, m, edges, beta0, theta0, latency, wm2, gears)
+make_ugn(beta0, gear, latency, theta0_at_src,  wm2_at_src, theta0_at_dst)
 ```
 
 ## Index

@@ -9,13 +9,6 @@ import ..Topology: Graph
 import ..SimCore: Error
 
 
-#, println, srcdest, srcdest2, isrcdest2
-
-# The constants associated with each link.
-# These links are unidirectional
-# from the head of the elastic buffer at src
-# to the head of the elastic buffer at dst
-
 """
    Link structure
 
@@ -75,51 +68,19 @@ function bisection(f, a, b, tol = 1e-5)
 end
 
 
+"""
+    a tuplmake_ugn(beta0, gear, latency, theta0_at_src,  wm2_at_src, theta0_at_dst) 
 
-# # convert
-# #
-# #  X is n by n matrix,  X[i,j] = quantity at i associated with link i -> j
-# #
-# # to vectors associating quantities to src/dest of edges
-# #
-# #  xs  an m-vector,  xs[e] = X[i,j] where e = i->j
-# #  xd  an m-vector,  xd[e] = X[j,i] where e = i->j
-# #   
-# function srcdest(links, X)
-#     m = length(links)
-#     xs = similar(X, m)
-#     xd = similar(X, m)
-#     for e=1:m
-#         i = links[e][1]
-#         j = links[e][2]
-#         xs[e] = X[i,j]
-#         xd[e] = X[j,i]
-#     end
-#     return xs, xd
-# end
+Compute the value for the UGN of a particular link, given
 
-# srcdest2(links, X) = vcat(srcdest(links, X)...)
+ - `beta0`: the initial occupancy of the elastic buffer at the destination
+ - `gear`: the gear ratio of the link, that is the number of frames sent per source clock tick
+ - `latency`: the time taken for a frame to traverse the link
+ - `theta0_at_src`: the value of the clock phase at time 0 at the source end of the link
+ - `wm2_at_src`: the clock frequency at the source end of the link for times < 0
+ - `theta0_at_dst`: the value of the clock phase at time 0 at the destination end of the link
 
-
-# function isrcdest2(links, x)
-#     m = length(links)
-#     xs = x[1:m]
-#     xd = x[m+1:end]
-#     n = maximum(max(s,d) for (s,d) in links)
-#     X = similar(x, Union{Missing, eltype(x)}, n, n)
-#     fill!(X, missing)
-#     for e=1:m
-#         i = links[e][1]
-#         j = links[e][2]
-#         X[i,j] = xs[e]
-#         X[j,i] = xd[e]
-#     end
-#     return X
-# end
-
-# map 2m length vector to 2 m-length vectors
-
-
+"""
 function make_ugn(beta0, gear, latency, theta0_at_src,  wm2_at_src, theta0_at_dst)
     return beta0 - floor(gear*(theta0_at_src - latency * wm2_at_src)) + floor(gear*theta0_at_dst)
 end
