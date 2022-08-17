@@ -83,9 +83,9 @@ julia> c = CalOpts(; kwargs...)
 
 The following is a more complete example. In particular, here we are setting the uncontrolled frequencies of the system to be approximately 200MHz, with a maximum error of 100ppm. 
 
-We are also running the system in units of nanoseconds, so 200MHz corresponds to a frequency of 0.2.  The sampling period of the controller is given by `poll_period`, but this is in units of localticks. Because sampling is driven by the local clock, it can only be set in localticks. The variable `base_freq` contains the approximate frequency (or *base frequency*) of the oscillators. Here we scale `poll_period` by the base frequency so that the sampling rate is about 1e5 nanoseconds.
+We are also running the system in units of nanoseconds, so 200MHz corresponds to a frequency of 0.2.  The sampling period of the controller is given by `poll_period`, but this is in units of localticks. Because sampling is driven by the local clock, it can only be set in localticks. The variable `typical_freq` contains the approximate frequency of the oscillators. Here we scale `poll_period` by the typical frequency so that the sampling rate is about 1e5 nanoseconds.
 
-The `base_freq` option to `CalOpts` is used by the controller. Because we are using a PI controller, setting the `base_freq` is important. In the PI controller, the integral is approximated by a running sum scaled by the approximate sampling period, which is `1/base_freq`.
+The `base_freq` option to `CalOpts` is used by the controller. Because we are using a PI controller, setting the `base_freq` is important. In the PI controller, the integral is approximated by a running sum scaled by `1/base_freq`. We set `base_freq` equal to `typical_freq` for this approximation.
 
 
 
@@ -107,18 +107,18 @@ plot(d, f; kw...) = save(drawplot(tzip(d); kw...), plotpath(f), 4)
 function main()
     tmax = 2e8
     num_nodes = 6
-    base_freq = 0.2 # GHz
+    typical_freq = 0.2 # GHz
     max_ppm = 100
     Random.seed!(1)
-    freqs = base_freq * (1 .+  rand(-max_ppm:max_ppm, num_nodes) /  1e6)
+    freqs = typical_freq * (1 .+  rand(-max_ppm:max_ppm, num_nodes) /  1e6)
     errors =  [Error(a) for a in freqs]
     c = CalOpts(; topology=("mesh", 3, 2),
                 ki = 1e-15,
                 kp = 2e-8,
                 latency = 200,     
                 control_delay = 10,
-                poll_period = 1e5 * base_freq,
-                base_freq,
+                poll_period = 1e5 * typical_freq,
+                base_freq = typical_freq,
                 tmax,
                 errors)
     x = callisto(c)
