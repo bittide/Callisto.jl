@@ -1,3 +1,5 @@
+![Callisto icon](assets/callisto_icon_white_48.png)
+
 # Callisto.jl
 Julia simulator for the bittide synchronization layer
 
