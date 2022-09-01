@@ -33,11 +33,11 @@ end
 
 
 
-meas(link, t, theta) = (beta(link, t, theta) - link.offset)/link.gear
+meas(link, t, theta, betafn) = (betafn(link, t, theta) - link.offset)/link.gear
 
 ##############################################################################
 
-function Gx(i, theta, s, theta0, p, links, incoming, d, slog)
+function Gx(i, theta, s, theta0, p, links, incoming, d, betafn, slog)
     k = round((theta[i].y[end] - d - theta0[i])/p)
 
     # following two approaches are both fine
@@ -46,7 +46,7 @@ function Gx(i, theta, s, theta0, p, links, incoming, d, slog)
 
     llog(slog, 2, k)
     llog(slog, 5, t)
-    y = [ (e, meas(links[e], t, theta), t) for e in incoming[i]]
+    y = [ (e, meas(links[e], t, theta, betafn), t) for e in incoming[i]]
     return y
 end
 
@@ -87,7 +87,7 @@ end
 
 
 function callisto(tmax, epoch, num_nodes, links, incoming, p, d, errors,
-                  theta0, freq_m2, freq_m1, wmin, controller_init, controller_next)
+                  theta0, freq_m2, freq_m1, wmin, betafn, controller_init, controller_next)
 
     @assert d < p
     if tmax/p < 10
@@ -98,7 +98,7 @@ function callisto(tmax, epoch, num_nodes, links, incoming, p, d, errors,
     slog = Log(8,header)
 
     initial_state(i) = initial_statex(i, epoch, freq_m2[i], freq_m1[i], theta0[i], d, slog)
-    G(i, theta, s)   = Gx(i, theta, s, theta0, p, links, incoming, d, slog)
+    G(i, theta, s)   = Gx(i, theta, s, theta0, p, links, incoming, d, betafn, slog)
     C(i, y)          = Cx(i, y, controller_states, controller_next, slog)
     F(i, theta, ds)   = Fx(i, theta, ds, p)
 
@@ -134,6 +134,7 @@ function callisto(c)
                                    c.wm2,
                                    c.wm1,
                                    c.wmin,
+                                   c.betafn,
                                    c.controller_init,
                                    c.controller_next)
 
