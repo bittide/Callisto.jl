@@ -6,7 +6,7 @@ export CalOpts
 using Random
 
 import ..Topology: Graph
-import ..SimCore: Error
+import ..SimCore: Error, beta
 
 
 """
@@ -42,6 +42,7 @@ mutable struct CalOpts
     wm2
     wmin
     epoch
+    betafn
     controller_init
     controller_next
 end
@@ -111,6 +112,7 @@ function CalOpts(;topology = ("mesh", 3, 2), graph = nothing,
                  bidirectional = true,
                  base_freq = 1,
                  wmin = 0.1,
+                 betafn = nothing,
                  wm1 = nothing, wm2 = nothing,
                  controller_init = nothing, controller_next = nothing,
                  errors=nothing, gears = nothing, beta0 = 50)
@@ -212,6 +214,9 @@ function CalOpts(;topology = ("mesh", 3, 2), graph = nothing,
         controller_next = cnext
     end
 
+    if isnothing(betafn)
+        betafn = beta
+    end
 
     c = CalOpts(g,
                 links,
@@ -226,6 +231,7 @@ function CalOpts(;topology = ("mesh", 3, 2), graph = nothing,
                 wm2,
                 wmin,
                 epoch,
+                betafn,
                 controller_init,
                 controller_next
                 )
