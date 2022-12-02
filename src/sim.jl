@@ -58,9 +58,9 @@ function sum_or_missing(x)
 end
 
 # note controller cannot exactly implement PI, since it does not know t
-function Cx(i, y, controller_states, controller_next, slog)
+function Cx(i, y, controller_states, controller_next, controller_log, slog)
     llog(slog, 7, sum_or_missing(a[2] for a in y))
-    llog(slog, 8, controller_states[i][1])
+    llog(slog, 8, controller_log(i, controller_states[i]))
     controller_states[i], corr = controller_next(i, controller_states[i], y)
     return corr
 end
@@ -87,7 +87,8 @@ end
 
 
 function callisto(tmax, epoch, num_nodes, links, incoming, p, d, errors,
-                  theta0, freq_m2, freq_m1, wmin, betafn, controller_init, controller_next)
+                  theta0, freq_m2, freq_m1, wmin, betafn,
+                  controller_init, controller_next, controller_log)
 
     @assert d < p
     if tmax/p < 10
@@ -99,7 +100,7 @@ function callisto(tmax, epoch, num_nodes, links, incoming, p, d, errors,
 
     initial_state(i) = initial_statex(i, epoch, freq_m2[i], freq_m1[i], theta0[i], d, slog)
     G(i, theta, s)   = Gx(i, theta, s, theta0, p, links, incoming, d, betafn, slog)
-    C(i, y)          = Cx(i, y, controller_states, controller_next, slog)
+    C(i, y)          = Cx(i, y, controller_states, controller_next, controller_log, slog)
     F(i, theta, ds)   = Fx(i, theta, ds, p)
 
     theta = [initial_state(i) for i=1:num_nodes]
@@ -136,7 +137,8 @@ function callisto(c)
                                    c.wmin,
                                    c.betafn,
                                    c.controller_init,
-                                   c.controller_next)
+                                   c.controller_next,
+                                   c.controller_log)
 
     return (simlog = simlog, theta = theta,)
 end
