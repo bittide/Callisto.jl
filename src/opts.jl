@@ -43,8 +43,10 @@ mutable struct CalOpts
     wmin
     epoch
     betafn
+    base_freq
     controller_init
     controller_next
+    controller_log
 end
 
 
@@ -114,6 +116,7 @@ function CalOpts(;topology = ("mesh", 3, 2), graph = nothing,
                  wmin = 0.1,
                  betafn = nothing,
                  wm1 = nothing, wm2 = nothing,
+                 controller_log = nothing,
                  controller_init = nothing, controller_next = nothing,
                  errors=nothing, gears = nothing, beta0 = 50)
 
@@ -197,6 +200,10 @@ function CalOpts(;topology = ("mesh", 3, 2), graph = nothing,
         controller_init = () -> 0.0
     end
 
+    if isnothing(controller_log)
+        controller_log = (i, xi) -> xi
+    end
+
     function cnext(i, xi, measurement)
         if length(measurement) == 0
             # can have no measurements if
@@ -232,8 +239,10 @@ function CalOpts(;topology = ("mesh", 3, 2), graph = nothing,
                 wmin,
                 epoch,
                 betafn,
+                base_freq,
                 controller_init,
-                controller_next
+                controller_next,
+                controller_log
                 )
 
     return c

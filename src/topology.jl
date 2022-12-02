@@ -66,12 +66,12 @@ Possible topologies include
  - ("tree", d, c)        Tree with depth d and c children per level
 
 """
-function Graph(topology; bidirectional = false)
+function Graph(topology; bidirectional = false, treeedgesfirst = false)
     edges, n = get_topology(topology)
     if bidirectional
         edges = make_bidirectional(edges)
     end
-    return Graph(edges, n; topology)
+    return Graph(edges, n; topology, treeedgesfirst)
 end
 
 
@@ -80,14 +80,14 @@ end
 
 Constructor. `edges` is a list of Tuples of node ids, `n` is the number of nodes.
 """
-function Graph(edges, n; topology = ("unknown"))
+function Graph(edges, n; topology = ("unknown"), treeedgesfirst = false)
     m = length(edges)
     incoming_nodes = get_incoming_nodes(edges, n)
     adjacent_edges = get_adjacent_edges(edges, n)
     incoming_edges = get_incoming_edges(edges, n)
     outgoing_edges = get_outgoing_edges(edges, n)
     incidence = get_incidence(edges, n)
-    return Graph(edges, n, m, incidence, incoming_nodes,
+    g = Graph(edges, n, m, incidence, incoming_nodes,
                  adjacent_edges, outgoing_edges, incoming_edges, topology)
 end
     
