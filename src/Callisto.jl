@@ -13,6 +13,9 @@ using .Topology
 include("simcore.jl")
 using .SimCore
 
+include("statedynamics.jl")
+using .StateDynamics
+
 # depends on SimCore and Topology 
 include("opts.jl")
 using .Opts
