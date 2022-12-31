@@ -35,7 +35,8 @@ mutable struct Graph
     adjacent_edges      # adjacent_edges[i] is a list of edges that connect to node i
     outgoing_edges      # outgoing_edges[i] is a list of edges that depart from node i
     incoming_edges      # incoming_edges[i] is a list of edges which arrive at node i
-    topology            # tuple 
+    topology            # tuple
+    layout              # a list of tuples giving coordinates in the plane
 end
 
 
@@ -68,11 +69,11 @@ Possible topologies include
 
 """
 function Graph(topology; bidirectional = false, treeedgesfirst = false)
-    edges, n = get_topology(topology)
+    edges, n, layout = get_topology(topology)
     if bidirectional
         edges = make_bidirectional(edges)
     end
-    return Graph(edges, n; topology, treeedgesfirst)
+    return Graph(edges, n; layout, topology, treeedgesfirst)
 end
 
 
@@ -81,7 +82,7 @@ end
 
 Constructor. `edges` is a list of Tuples of node ids, `n` is the number of nodes.
 """
-function Graph(edges, n; topology = ("unknown"), treeedgesfirst = false)
+function Graph(edges, n; layout = nothing, topology = ("unknown"), treeedgesfirst = false)
     m = length(edges)
     if treeedgesfirst
         edges = edges[find_spanning_tree(edges, n)]
@@ -97,7 +98,7 @@ function Graph(edges, n; topology = ("unknown"), treeedgesfirst = false)
         fundamental_cycles = nothing
     end
     g = Graph(edges, n, m, incidence, fundamental_cycles, incoming_nodes,
-              adjacent_edges, outgoing_edges, incoming_edges, topology)
+              adjacent_edges, outgoing_edges, incoming_edges, topology, layout)
 end
 
 
@@ -243,6 +244,24 @@ end
 edge(s, d)  = (src = s, dst=d)
 
 
+function meshlayout(nx, ny)
+     n = nx * ny
+     xlist = Tuple{Float64, Float64}[]
+     for i = 1:n
+         xc = (i-1) % nx
+         yc = div(i-1, nx)
+         push!(xlist, (xc, yc))
+     end
+     return xlist
+end
+
+dist(a,b) = sqrt((a[1] - b[1])^2 + (a[2] - b[2])^2) 
+function hcube(i, d)
+    s = bitstring(i)[end-d+1:end]
+    z = [parse(Int, s[k]) for k=1:d]
+    return 2z .- 1
+end
+
 """
     get_topology(topology)
 
@@ -254,9 +273,11 @@ function get_topology(topology)
     if topology[1] == "triangle"
         edges = [edge(1,2), edge(1,3), edge(2,3)] # topology
         n = 3
+        layout = [(0.5, -1/sqrt(12)), (-0.5, -1/sqrt(12)), (0.0, 1/sqrt(3))]
         
     elseif topology[1] == "diamond"
         edges = [edge(1,2), edge(2,3), edge(3,4), edge(4,2), edge(1,3)]
+        layout = meshlayout(2,2)
         n = 4
         
     elseif topology[1] == "full"
@@ -268,6 +289,11 @@ function get_topology(topology)
                 push!(edges, edge(j,i))
             end
         end
+        layout = [(cos(2*pi*i/n), sin(2*pi*i/n)) for i=0:n-1]
+        r = dist(layout[1], layout[2])
+        layout = [(a/r,b/r) for (a,b) in layout]
+            
+            
         
     elseif topology[1] == "line"
         n = topology[2]
@@ -275,6 +301,8 @@ function get_topology(topology)
         for i=2:n
             push!(edges, edge(i-1,i))
         end
+        layout = meshlayout(n,1)
+
         
     elseif topology[1] == "hypercube"
         degree = topology[2]
@@ -287,6 +315,25 @@ function get_topology(topology)
                     push!(edges, edge(i+1, j+1))
                 end
             end
+        end
+        if degree == 1
+            layout = meshlayout(2,1)
+        elseif degree == 2
+            layout = meshlayout(2,2)
+        elseif degree == 3
+            x0 = meshlayout(2,2)
+            x1 = [(a-0.5, b-0.5) for (a,b) in x0]
+            x2 = [(3a,3b) for (a,b) in x1]
+            layout = vcat(x1, x2)
+        elseif degree == 4
+            points4d = [hcube(i,degree) for i = 0:2^degree-1]
+            q = sqrt(2)
+            A = [sqrt(2)  0       -1  -1
+                 0        sqrt(2)  1  -1 ]
+            x1 = [A*z for z in points4d]
+            layout = [(a[1],a[2]) for a in x1]
+        else
+            layout = nothing
         end
         
     elseif topology[1] == "mesh"
@@ -310,6 +357,8 @@ function get_topology(topology)
                 end
             end
         end
+        layout = meshlayout(mx, my)
+
         
     elseif topology[1] == "star"
         hosts = topology[2]
@@ -318,7 +367,10 @@ function get_topology(topology)
         for y = 1:hosts
             push!(edges, edge(1, y+1))
         end
+        layout = [(cos(2*pi*i/hosts), sin(2*pi*i/hosts)) for i=0:hosts-1]
+        pushfirst!(layout, (0.0, 0.0))
         
+
     elseif topology[1] == "torus2d"
         mx = topology[2]
         my = topology[3]
@@ -333,6 +385,7 @@ function get_topology(topology)
                 end
             end
         end
+        layout = nothing
         
     elseif topology[1] == "torus3d"
         mx = topology[2]
@@ -353,6 +406,7 @@ function get_topology(topology)
                 end
             end
         end
+        layout = nothing
         
     elseif topology[1] == "tree"
         height = topology[2]
@@ -368,13 +422,14 @@ function get_topology(topology)
             end
         end
         n = (1 - children^(height))/(1-children)
+        layout = nothing
     end
 
     # At the moment all of the above topologies satisfy this property.
     # But one could have a topology where node n is isolated.
     # This test will then fail.
     @assert n == maximum(max(s,d) for (s,d) in edges)
-    return edges, n
+    return edges, n, layout
 end
 
 """

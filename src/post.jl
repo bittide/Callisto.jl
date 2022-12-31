@@ -3,8 +3,9 @@ module Post
 
 
 export parse_callisto_log, parse_callisto_logx, focused_callisto_info, get_freq
+export getlatency, getlambda, getbeta, getomega, getdata
 
-import ..SimCore:    beta
+import ..SimCore:    beta, gamma
 import ..LogData:    make_tuples, get_records
 import ..Piecewise:  PiecewiseConstant, Samples, delay, after, before, PiecewiseLinear
 
@@ -139,6 +140,35 @@ function focused_callisto_info(c, xc, tmin, tmax)
 end
 
 
+
+getlatency(c) = [l.latency for l in c.links]
+getlambda(c) = [l.ugn for l in c.links]
+getomega(t, xc) = [f(t) for f in xc.freq]
+getbeta(t, c, xc) = [beta(l, t, xc.theta) for l in c.links]
+getgamma(t, c, xc) = [gamma(l, t, xc.theta) for l in c.links]
+
+function getbsdz(c)
+    B = c.graph.incidence
+    S = Int.(B .> 0)
+    D = Int.(B .< 0)
+    Z = c.graph.fundamental_cycles
+    return B, S, D, Z
+end
+
+function getdata(t, c, xc)
+    B, S, D, Z = getbsdz(c)
+    d = (c = c, xc = xc, t = t, 
+         B = B, S = S, D = D, Z = Z,
+         lambda = getlambda(c),
+         latency = getlatency(c), 
+         beta0  = getbeta(0, c, xc), 
+         gamma0 = getgamma(0, c, xc), 
+         omega0 = getomega(0, xc), 
+         beta   = getbeta(t, c, xc), 
+         gamma  = getgamma(t, c, xc), 
+         omega  = getomega(t, xc))
+    return d
+end
 
 
 end
