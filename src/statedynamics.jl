@@ -94,7 +94,11 @@ end
 which_subsystem(endtimes, t) = searchsortedfirst(endtimes, t)
 
 
-# controller t takes state t and measurement, determines state t+1
+# Controller t takes state t and measurement, determines state t+1
+# Note that this allows for sequential switching between
+# a finite set of controllers. It does not allow for repeating
+# patterns. Repeated patterns have not yet been needed but will
+# probably be necessary in future so should be implemented.
 function next(K::SequentialStateSystem, measurement)
     t = K.count 
 
