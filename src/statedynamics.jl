@@ -10,6 +10,25 @@ module StateDynamics
 abstract type StateSystem
 end
 
+# These systems have dynamics defined as follows
+# Suppose K is a StateSystem, and
+#
+#   y = [next(K, a) for a in u]
+#
+# then, for some function f and some state
+#
+#  K.state[1] = <set by constructor>
+#
+#
+#  K.state[t+1] = f(K.state[t], u[t])
+#          y[t] = next(K.state[t], u[t])
+#
+#
+# The state may be any field of K; it need not be named "state".
+# The function f is determined internally by the definition of next.
+#
+
+
 ##############################################################################
 # PI controller
 
@@ -75,8 +94,8 @@ end
 ##############################################################################
 # switching wrapper
 
-mutable struct SequentialStateSystem
-    count        # time
+mutable struct SequentialStateSystem <: StateSystem
+    count        # number of times next has been called
     lastoutput
     subsystems   # list of controller objects
     endtimes     # times on which to switch
@@ -91,6 +110,7 @@ end
 # endtimes = [5, 10]
 #   which_subsystem = 1  for t <= 5
 #   which_subsystem = 2  for 6 <= t <= 10
+#   which_subsystem = 3  for 11 <= t
 which_subsystem(endtimes, t) = searchsortedfirst(endtimes, t)
 
 
@@ -102,8 +122,8 @@ which_subsystem(endtimes, t) = searchsortedfirst(endtimes, t)
 function next(K::SequentialStateSystem, measurement)
     t = K.count 
 
-    previous_subsystem_index = which_subsystem(K.endtimes, t-1)
-    this_subsystem_index = which_subsystem(K.endtimes, t)
+    previous_subsystem_index = which_subsystem(K.endtimes, t)
+    this_subsystem_index = which_subsystem(K.endtimes, t+1)
     if this_subsystem_index > previous_subsystem_index
         K.switches[previous_subsystem_index](K.lastoutput)
     end
