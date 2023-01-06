@@ -26,15 +26,16 @@ The source data here consists of `edges` and `n`. Apart from `topology`,
 everything else is computed from those two quantities. 
 """
 mutable struct Graph
-    edges            # list of named tuples, numbered 1,...,m, where m = length(edges)
-    n                # number of nodes. Nodes are numbered 1,...,n
-    m                # number of edges
-    incidence        # n by m incidence matrix
-    incoming_nodes   # incoming_nodes[i] is a list of incoming neighbors of i
-    adjacent_edges   # adjacent_edges[i] is a list of edges that connect to node i
-    outgoing_edges   # outgoing_edges[i] is a list of edges that depart from node i
-    incoming_edges   # incoming_edges[i] is a list of edges which arrive at node i
-    topology         # tuple 
+    edges               # list of named tuples, numbered 1,...,m, where m = length(edges)
+    n                   # number of nodes. Nodes are numbered 1,...,n
+    m                   # number of edges
+    incidence           # n by m incidence matrix
+    fundamental_cycles  # m by (m-n+1) matrix whose cols are the fcycles
+    incoming_nodes      # incoming_nodes[i] is a list of incoming neighbors of i
+    adjacent_edges      # adjacent_edges[i] is a list of edges that connect to node i
+    outgoing_edges      # outgoing_edges[i] is a list of edges that depart from node i
+    incoming_edges      # incoming_edges[i] is a list of edges which arrive at node i
+    topology            # tuple 
 end
 
 
@@ -82,15 +83,69 @@ Constructor. `edges` is a list of Tuples of node ids, `n` is the number of nodes
 """
 function Graph(edges, n; topology = ("unknown"), treeedgesfirst = false)
     m = length(edges)
+    if treeedgesfirst
+        edges = edges[find_spanning_tree(edges, n)]
+    end
     incoming_nodes = get_incoming_nodes(edges, n)
     adjacent_edges = get_adjacent_edges(edges, n)
     incoming_edges = get_incoming_edges(edges, n)
     outgoing_edges = get_outgoing_edges(edges, n)
     incidence = get_incidence(edges, n)
-    g = Graph(edges, n, m, incidence, incoming_nodes,
-                 adjacent_edges, outgoing_edges, incoming_edges, topology)
+    if treeedgesfirst
+        fundamental_cycles = find_fundamental_cycles(incidence)
+    else
+        fundamental_cycles = nothing
+    end
+    g = Graph(edges, n, m, incidence, fundamental_cycles, incoming_nodes,
+              adjacent_edges, outgoing_edges, incoming_edges, topology)
 end
-    
+
+
+"""
+    find_fundamental_cycles(B)
+
+Returns a matrix whose columns are incidence vectors
+for the fundamental cycles of the graph. In particular
+they form an integral basis for null(B). Note that B must
+be sorted so that the first n-1 columns are the edges of
+a spanning tree.
+"""
+function find_fundamental_cycles(B)
+    n, m = size(B)
+    B11 = B[1:n-1, 1:n-1]
+    B12 = B[1:n-1, n:m]
+    N = B11 \ B12
+    Z = [-Int.(round.(N)); I(m-n+1)]
+    return Z
+end
+
+
+
+"""
+    find_spanning_tree(edges, n)
+
+Return a permutation vector p of length m such that p[1:n-1] are
+the edge ids of a spanning tree.
+
+"""
+function find_spanning_tree(edges, n)
+    m = length(edges)
+    treeedges = []
+    nontreeedges = []
+    treenodes = Set()
+    for i = 1:m
+        e = edges[i]
+        if ! (e.src in treenodes) || !(e.dst in treenodes)
+            push!(treeedges, i)
+            push!(treenodes, e.src)
+            push!(treenodes, e.dst)
+        else
+            push!(nontreeedges, i)
+        end
+    end
+    p = vcat(treeedges, nontreeedges)
+    return p
+end
 
 """
     get_incoming_nodes(edges, n)
