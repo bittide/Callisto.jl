@@ -22,7 +22,7 @@ function get_freq(c, Tdata)
     return freq
 end
 
-function get_occ_samples(c, theta, times)   
+function get_occ_samples(c, theta, times)
     # construct occupancies at measurement times
     n = c.graph.n
     m = c.graph.m
@@ -44,7 +44,7 @@ function parse_callisto_log(c, Tdata, theta)
     d = c.control_delay
     n = c.graph.n
     m = c.graph.m
-    
+
     meas = Samples[]
     for i=1:n
         X = get_records(Tdata, x -> x.nid == i)
@@ -66,7 +66,7 @@ function parse_callisto_log(c, Tdata, theta)
         push!(xi, cs)
     end
 
-    
+
     # construct occupancies at measurement times
     mocc = Array{Union{Missing,Samples}, 1}(missing, m)
     for link in c.links
@@ -81,7 +81,7 @@ end
 function parse_callisto_logx(c, simlog, theta)
     Tdata = make_tuples(simlog)
     freq = get_freq(c, Tdata)
-    meas, xi, mocc = parse_callisto_log(c, Tdata, theta)  
+    meas, xi, mocc = parse_callisto_log(c, Tdata, theta)
     adjusted_freqs = [ 10^9*(f + (-1)) for f in freq]
 
     return (simlog=simlog, theta=theta, freq=freq, meas=meas,
@@ -157,15 +157,15 @@ end
 
 function getdata(t, c, xc)
     B, S, D, Z = getbsdz(c)
-    d = (c = c, xc = xc, t = t, 
+    d = (c = c, xc = xc, t = t,
          B = B, S = S, D = D, Z = Z,
          lambda = getlambda(c),
-         latency = getlatency(c), 
-         beta0  = getbeta(0, c, xc), 
-         gamma0 = getgamma(0, c, xc), 
-         omega0 = getomega(0, xc), 
-         beta   = getbeta(t, c, xc), 
-         gamma  = getgamma(t, c, xc), 
+         latency = getlatency(c),
+         beta0  = getbeta(0, c, xc),
+         gamma0 = getgamma(0, c, xc),
+         omega0 = getomega(0, xc),
+         beta   = getbeta(t, c, xc),
+         gamma  = getgamma(t, c, xc),
          omega  = getomega(t, xc))
     return d
 end
