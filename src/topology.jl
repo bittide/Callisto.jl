@@ -1,5 +1,3 @@
-
-
 module Topology
 
 using LinearAlgebra
@@ -10,7 +8,7 @@ export Graph, resistance, index_by_node
 """
     mutable struct Graph
 
-A directed graph. 
+A directed graph.
 
 Fields are:
  - edges            list of edges. Each edge is a Tuple of the form `(i,j)`
@@ -23,7 +21,7 @@ Fields are:
  - topology         tuple
 
 The source data here consists of `edges` and `n`. Apart from `topology`,
-everything else is computed from those two quantities. 
+everything else is computed from those two quantities.
 """
 mutable struct Graph
     edges               # list of named tuples, numbered 1,...,m, where m = length(edges)
@@ -154,7 +152,7 @@ end
 Return the neighbors of every node.
 
 Return a list `incoming_nodes` such that `incoming_nodes[i]` is the list
-of incoming neighbors of node `i`. 
+of incoming neighbors of node `i`.
 """
 function get_incoming_nodes(edges, n)
     incoming_nodes = [Int64[] for i=1:n]
@@ -169,10 +167,10 @@ end
     get_incidence(edges, n)
 
 Return the incidence matrix of the graph.
-    
+
 The incidence matrix `B` is `n` by `m`, where `n` is the number of nodes
 and `m` is the number of edges. It is defined by
-    
+
     B[i,j] = 1  if edge j starts at link i
     B[i,j] = -1 if edge j ends at link i
 """
@@ -255,7 +253,7 @@ function meshlayout(nx, ny)
      return xlist
 end
 
-dist(a,b) = sqrt((a[1] - b[1])^2 + (a[2] - b[2])^2) 
+dist(a,b) = sqrt((a[1] - b[1])^2 + (a[2] - b[2])^2)
 function hcube(i, d)
     s = bitstring(i)[end-d+1:end]
     z = [parse(Int, s[k]) for k=1:d]
@@ -274,12 +272,12 @@ function get_topology(topology)
         edges = [edge(1,2), edge(1,3), edge(2,3)] # topology
         n = 3
         layout = [(0.5, -1/sqrt(12)), (-0.5, -1/sqrt(12)), (0.0, 1/sqrt(3))]
-        
+
     elseif topology[1] == "diamond"
         edges = [edge(1,2), edge(2,3), edge(3,4), edge(4,2), edge(1,3)]
         layout = meshlayout(2,2)
         n = 4
-        
+
     elseif topology[1] == "full"
         n = topology[2]
         edges = Any[]
@@ -292,9 +290,7 @@ function get_topology(topology)
         layout = [(cos(2*pi*i/n), sin(2*pi*i/n)) for i=0:n-1]
         r = dist(layout[1], layout[2])
         layout = [(a/r,b/r) for (a,b) in layout]
-            
-            
-        
+
     elseif topology[1] == "line"
         n = topology[2]
         edges = Any[]
@@ -303,7 +299,6 @@ function get_topology(topology)
         end
         layout = meshlayout(n,1)
 
-        
     elseif topology[1] == "hypercube"
         degree = topology[2]
         n = 2^degree
@@ -335,7 +330,7 @@ function get_topology(topology)
         else
             layout = nothing
         end
-        
+
     elseif topology[1] == "mesh"
         mx = topology[2]
         my = topology[3]
@@ -359,7 +354,6 @@ function get_topology(topology)
         end
         layout = meshlayout(mx, my)
 
-        
     elseif topology[1] == "star"
         hosts = topology[2]
         n = hosts + 1
@@ -369,7 +363,6 @@ function get_topology(topology)
         end
         layout = [(cos(2*pi*i/hosts), sin(2*pi*i/hosts)) for i=0:hosts-1]
         pushfirst!(layout, (0.0, 0.0))
-        
 
     elseif topology[1] == "torus2d"
         mx = topology[2]
@@ -386,7 +379,7 @@ function get_topology(topology)
             end
         end
         layout = nothing
-        
+
     elseif topology[1] == "torus3d"
         mx = topology[2]
         my = topology[3]
@@ -407,7 +400,7 @@ function get_topology(topology)
             end
         end
         layout = nothing
-        
+
     elseif topology[1] == "tree"
         height = topology[2]
         children = topology[3]
