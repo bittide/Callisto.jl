@@ -2,7 +2,7 @@
 
 module SimCore
 
-export Error
+export Error, beta, gamma
 
 import ..Piecewise: PiecewiseLinear
 
@@ -52,6 +52,8 @@ end
 
 
 beta((;ugn, src, dst, latency, gear), t, theta) = ugn + floor(gear*theta[src](t - latency)) - floor(gear*theta[dst](t))
+
+gamma((;src, dst, latency, gear), t, theta) = floor(gear*theta[src](t)) - floor(gear*theta[src](t-latency))
 
 
 

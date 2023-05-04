@@ -230,7 +230,6 @@ automaticresetcontroller(c) = AutomaticResetStateSystem(c.kp, c.ki * c.poll_peri
 picontroller(c) = PIStateSystem(c.kp, c.ki * c.poll_period / c.base_freq) * AverageOccupancyStateSystem()
 pcontroller(c) = StaticStateSystem(u -> c.kp*u) * AverageOccupancyStateSystem()
 
-
 ##############################################################################
 # controller functions
 
@@ -243,9 +242,6 @@ function controllerfunctions(controllers)
     controller_log(i, Klist) = 0
     return getopts(; controller_init, controller_next, controller_log)
 end
-
-
-
 
 
 

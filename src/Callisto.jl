@@ -49,7 +49,7 @@ export resistance
 # exports from simcore.jl
 
 export Error
-
+export beta, gamma
 #------------------------------------------------------------------------------
 # exports from opts.jl
 
@@ -58,12 +58,13 @@ export CalOpts
 #------------------------------------------------------------------------------
 # exports from sim.jl
 
-export callisto, beta
+export callisto
 
 #------------------------------------------------------------------------------
 # exports from post.jl
 
 export parse_callisto_log, parse_callisto_logx, focused_callisto_info, get_freq
+export getlatency, getlambda, getbeta, getomega, getdata
 
 
 

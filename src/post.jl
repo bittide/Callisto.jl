@@ -3,8 +3,9 @@ module Post
 
 
 export parse_callisto_log, parse_callisto_logx, focused_callisto_info, get_freq
+export getlatency, getlambda, getbeta, getomega, getdata
 
-import ..SimCore:    beta
+import ..SimCore:    beta, gamma
 import ..LogData:    make_tuples, get_records
 import ..Piecewise:  PiecewiseConstant, Samples, delay, after, before, PiecewiseLinear
 
@@ -21,7 +22,7 @@ function get_freq(c, Tdata)
     return freq
 end
 
-function get_occ_samples(c, theta, times)   
+function get_occ_samples(c, theta, times)
     # construct occupancies at measurement times
     n = c.graph.n
     m = c.graph.m
@@ -43,7 +44,7 @@ function parse_callisto_log(c, Tdata, theta)
     d = c.control_delay
     n = c.graph.n
     m = c.graph.m
-    
+
     meas = Samples[]
     for i=1:n
         X = get_records(Tdata, x -> x.nid == i)
@@ -65,7 +66,7 @@ function parse_callisto_log(c, Tdata, theta)
         push!(xi, cs)
     end
 
-    
+
     # construct occupancies at measurement times
     mocc = Array{Union{Missing,Samples}, 1}(missing, m)
     for link in c.links
@@ -80,7 +81,7 @@ end
 function parse_callisto_logx(c, simlog, theta)
     Tdata = make_tuples(simlog)
     freq = get_freq(c, Tdata)
-    meas, xi, mocc = parse_callisto_log(c, Tdata, theta)  
+    meas, xi, mocc = parse_callisto_log(c, Tdata, theta)
     adjusted_freqs = [ 10^9*(f + (-1)) for f in freq]
 
     return (simlog=simlog, theta=theta, freq=freq, meas=meas,
@@ -139,6 +140,35 @@ function focused_callisto_info(c, xc, tmin, tmax)
 end
 
 
+
+getlatency(c) = [l.latency for l in c.links]
+getlambda(c) = [l.ugn for l in c.links]
+getomega(t, xc) = [f(t) for f in xc.freq]
+getbeta(t, c, xc) = [beta(l, t, xc.theta) for l in c.links]
+getgamma(t, c, xc) = [gamma(l, t, xc.theta) for l in c.links]
+
+function getbsdz(c)
+    B = c.graph.incidence
+    S = Int.(B .> 0)
+    D = Int.(B .< 0)
+    Z = c.graph.fundamental_cycles
+    return B, S, D, Z
+end
+
+function getdata(t, c, xc)
+    B, S, D, Z = getbsdz(c)
+    d = (c = c, xc = xc, t = t,
+         B = B, S = S, D = D, Z = Z,
+         lambda = getlambda(c),
+         latency = getlatency(c),
+         beta0  = getbeta(0, c, xc),
+         gamma0 = getgamma(0, c, xc),
+         omega0 = getomega(0, xc),
+         beta   = getbeta(t, c, xc),
+         gamma  = getgamma(t, c, xc),
+         omega  = getomega(t, xc))
+    return d
+end
 
 
 end
