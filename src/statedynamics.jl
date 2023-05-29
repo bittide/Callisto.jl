@@ -90,6 +90,30 @@ function setconstant(K::ConstantStateSystem, c)
     K.constant = c
 end
 
+##############################################################################
+# controlled switch
+
+mutable struct ControlledSwitchSystem <: StateSystem
+    lastoutput
+    subsystems       # list of controller objects
+    switches         # list of functions called at switch events
+    state
+    update           
+    whichsubsystem
+end
+
+
+function next(K::ControlledSwitchSystem, measurement)
+    this_subsystem_index, previous_subsystem_index = K.whichsubsystem(K)
+    if this_subsystem_index > previous_subsystem_index
+        K.switches[previous_subsystem_index](K.lastoutput)
+    end
+    K.update(K)
+    y = next(K.subsystems[this_subsystem_index], measurement)
+    K.lastoutput = y
+    return y
+ end
+
 
 ##############################################################################
 # switching wrapper
@@ -100,7 +124,6 @@ mutable struct SequentialStateSystem <: StateSystem
     subsystems   # list of controller objects
     endtimes     # times on which to switch
     switches     # list of functions called at switch events
-
 end
 
 function SequentialStateSystem(subsystems, endtimes, switches)
@@ -121,7 +144,6 @@ which_subsystem(endtimes, t) = searchsortedfirst(endtimes, t)
 # probably be necessary in future so should be implemented.
 function next(K::SequentialStateSystem, measurement)
     t = K.count 
-
     previous_subsystem_index = which_subsystem(K.endtimes, t)
     this_subsystem_index = which_subsystem(K.endtimes, t+1)
     if this_subsystem_index > previous_subsystem_index
