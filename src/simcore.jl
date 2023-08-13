@@ -4,7 +4,8 @@ module SimCore
 
 export Error, beta, gamma
 
-import ..Piecewise: PiecewiseLinear
+import ..Piecewise: PiecewiseLinear, definite_integral
+
 
 
 # uncontrolled frequency
@@ -42,6 +43,25 @@ Base.:+(a::ConstError, b::PiecewiseLinear) = Error(a.const_error + b)
 #
 local_to_realtime(e::ConstError, p, c, s, wmin) = p / (c + e.const_error)
     
+# assume f(a) < 0 and f(b) > 0
+function bisection(f, a, b, tol = 1e-5)
+    while true
+        c = (a + b)/2
+        if abs(a-b) < tol
+            return c
+        end
+        y = f(c)
+        if y == 0
+            return c
+        end
+        if y < 0
+            a = c
+        else
+            b = c
+        end
+    end
+end
+
 function local_to_realtime(e::PwlError, p, c, s, wmin)
     #   intfreq(s, ds, c) = definite_integral(c + e.pwl, s, s + ds)
     #   dt = bisection(ds -> intfreq(s, ds, c) - p,  0, tmax)
