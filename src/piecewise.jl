@@ -629,7 +629,7 @@ end
 ##############################################################################
 
 
-squarex(p::Series) =  T(p.x, p.y .* p.y)
+squarex(p::T) where {T<:Series} =  T(p.x, p.y .* p.y)
 square(p::Samples) =  squarex(p)
 square(p::PiecewiseConstant) =  squarex(p)
 
