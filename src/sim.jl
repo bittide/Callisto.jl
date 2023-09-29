@@ -3,12 +3,18 @@
 
 module Sim
 
+using DataStructures
+
 export callisto
 
 import ..Piecewise:  PiecewiseLinear, invert
 import ..LogData:    Log, llog, llognext
 import ..SimCore:    beta, local_to_realtime
 
+const USE_HEAP = true
+
+# also needed in opts.jl
+const USE_SUM_MEASUREMENT = true
 ##############################################################################
 
 function clog(slog, sk, nid, freq)
@@ -46,7 +52,14 @@ function Gx(i, theta, s, theta0, p, links, incoming, d, betafn, slog)
 
     llog(slog, 2, k)
     llog(slog, 5, t)
-    y = [ (e, meas(links[e], t, theta, betafn), t) for e in incoming[i]]
+    if USE_SUM_MEASUREMENT
+        y = 0.0
+        for e in incoming[i]
+            y += meas(links[e], t, theta, betafn)
+        end
+    else
+        y = [ (e, meas(links[e], t, theta, betafn), t) for e in incoming[i]]
+    end
     return y
 end
 
@@ -59,7 +72,12 @@ end
 
 # note controller cannot exactly implement PI, since it does not know t
 function Cx(i, y, controller_states, controller_next, controller_log, slog)
-    llog(slog, 7, sum_or_missing(a[2] for a in y))
+    if USE_SUM_MEASUREMENT
+        llog(slog, 7, y)
+    else
+        llog(slog, 7, sum_or_missing(a[2] for a in y))
+    end
+        
     llog(slog, 8, controller_log(i, controller_states[i]))
     controller_states[i], corr = controller_next(i, controller_states[i], y)
     return corr
@@ -88,8 +106,10 @@ end
 
 function callisto(tmax, epoch, num_nodes, links, incoming, p, d, errors,
                   theta0, freq_m2, freq_m1, wmin, betafn,
-                  controller_init, controller_next, controller_log)
+                  controller_init, controller_next, controller_log,
+                  special, stopper, sim_is_done)
 
+        
     @assert d < p
     if tmax/p < 10
         println("Warning; tmax < 10 * poll_period")
@@ -106,14 +126,31 @@ function callisto(tmax, epoch, num_nodes, links, incoming, p, d, errors,
     theta = [initial_state(i) for i=1:num_nodes]
     controller_states = [ controller_init() for i=1:num_nodes]
     s = 0.0
-    while s < tmax
-        s, i  = findmin([theta[j].x[end] for j=1:num_nodes])
+    if USE_HEAP
+        h = MutableBinaryMinHeap{Float64}()
+        for j=1:num_nodes
+            i = push!(h, theta[j].x[end])
+            @assert i == j
+        end
+    end
+    done = false
+    while s < tmax && !done
+        if USE_HEAP
+            s, i = top_with_handle(h)
+        else
+            s, i  = findmin([theta[j].x[end] for j=1:num_nodes])
+        end
         y = G(i, theta, s)
         c = C(i, y)
         ds = local_to_realtime(errors[i], p, c, s, wmin)
-        clog(slog, theta[i].x[end], i, c + errors[i](s))
-        @assert c + errors[i](s) > 0
+        w = c + errors[i](s)
+        clog(slog, theta[i].x[end], i, w)
+        #@assert c + errors[i](s) > 0
         F(i, theta, ds)
+        if USE_HEAP
+            update!(h, i, theta[i].x[end])
+        end
+        done = sim_is_done(stopper, s, i, w)
     end
     return slog, theta
 end
@@ -138,7 +175,10 @@ function callisto(c)
                                    c.betafn,
                                    c.controller_init,
                                    c.controller_next,
-                                   c.controller_log)
+                                   c.controller_log,
+                                   c.special,
+                                   c.stopper,
+                                   c.sim_is_done)
 
     return (simlog = simlog, theta = theta,)
 end

@@ -9,6 +9,9 @@ import ..Topology: Graph
 import ..SimCore: Error, beta
 
 
+# also needed in sim.jl
+const USE_SUM_MEASUREMENT = true
+
 """
    Link structure
 
@@ -47,6 +50,9 @@ mutable struct CalOpts
     controller_init
     controller_next
     controller_log
+    special
+    stopper
+    sim_is_done
 end
 
 
@@ -118,7 +124,8 @@ function CalOpts(;topology = ("mesh", 3, 2), graph = nothing,
                  wm1 = nothing, wm2 = nothing,
                  controller_log = nothing,
                  controller_init = nothing, controller_next = nothing,
-                 errors=nothing, gears = nothing, beta0 = 50)
+                 errors=nothing, gears = nothing, beta0 = 50,
+                 special = 0)
 
     if !isnothing(graph)
         g = graph
@@ -216,15 +223,28 @@ function CalOpts(;topology = ("mesh", 3, 2), graph = nothing,
         correction =  kp * r +  ki * next_state
         return next_state, correction
     end
-    
-    if isnothing(controller_next)
-        controller_next = cnext
+
+    function cnext_sum(i, xi, measurement)
+        r = measurement
+        next_state =  xi + poll_period*r/base_freq
+        correction =  kp * r +  ki * next_state
+        return next_state, correction
+    end
+
+    if isnothing(controller_next) 
+        if USE_SUM_MEASUREMENT 
+            controller_next = cnext_sum
+        else
+            controller_next = cnext
+        end
     end
 
     if isnothing(betafn)
         betafn = beta
     end
 
+    sim_is_done = (stopper, s, i, f) -> false
+    stopper = 0 
     c = CalOpts(g,
                 links,
                 tmax,
@@ -242,7 +262,10 @@ function CalOpts(;topology = ("mesh", 3, 2), graph = nothing,
                 base_freq,
                 controller_init,
                 controller_next,
-                controller_log
+                controller_log,
+                special,
+                stopper,
+                sim_is_done
                 )
 
     return c

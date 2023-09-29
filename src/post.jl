@@ -4,22 +4,91 @@ module Post
 
 export parse_callisto_log, parse_callisto_logx, focused_callisto_info, get_freq
 export getlatency, getlambda, getbeta, getomega, getdata
+export CalPost, FastPost, make_frequencies, make_measurements, make_measured_occupancy, fast_post_process
 
 import ..SimCore:    beta, gamma
-import ..LogData:    make_tuples, get_records
+import ..LogData:    make_tuples, get_records, make_records, get_field, make_fieldmap, num_records
 import ..Piecewise:  PiecewiseConstant, Samples, delay, after, before, PiecewiseLinear
 
 
-function get_freq(c, Tdata)
-    n = c.graph.n
-    freq = PiecewiseConstant[]
+Base.@kwdef mutable struct CalPost
+    c
+    simlog
+    tuples
+    start_ind_by_node
+    theta
+    freq = nothing
+    meas = nothing
+    xi = nothing
+    mocc = nothing
+end
+
+
+function make_fieldmap(cpost::CalPost)
+    cpost.fieldmap = make_fieldmap(cpost.simlog)
+end
+
+function CalPost(c, simlog, theta)
+    tuples = make_tuples(simlog)
+    sort!(tuples, by = x -> x.nid)
+    start_ind_by_node = [1]
+    nid = 2
+    for k=1:length(tuples)
+        if tuples[k].nid == nid
+            push!(start_ind_by_node, k)
+            nid += 1
+        end
+    end
+    push!(start_ind_by_node, length(tuples)+1)
+    cpost = CalPost(; c, simlog, tuples, start_ind_by_node, theta)
+end
+        
+get_data_for_node(cpost::CalPost, i) = cpost.tuples[cpost.start_ind_by_node[i]:cpost.start_ind_by_node[i+1]-1]
+
+
+function make_frequencies(cpost::CalPost)
+    n = cpost.c.graph.n
+    cpost.freq = PiecewiseConstant[]
     for i=1:n
-        X = get_records(Tdata, x -> x.nid == i)
+        X = get_data_for_node(cpost, i)
         fq = [a.freq for a in X]
         sk = [a.sk for a in X]
-        push!(freq, PiecewiseConstant(sk, fq[1:end-1]))
+        push!(cpost.freq, PiecewiseConstant(sk, fq[1:end-1]))
     end
-    return freq
+end
+
+function make_measurements(cpost::CalPost)
+    n = cpost.c.graph.n
+    cpost.meas = Samples[]
+    for i=1:n
+        X = get_data_for_node(cpost, i)
+        mdata = [a.meas for a in X]
+        tk = [a.tk for a in X]
+        sam = Samples(tk[3:end], mdata[3:end])
+        push!(cpost.meas, sam)
+    end
+end
+
+function make_controller_state(cpost::CalPost)
+    n = cpost.c.graph.n
+    cpost.xi = PiecewiseConstant[]
+    for i=1:n
+        X = get_data_for_node(cpost, i)
+        xdata = [a.xi for a in X]
+        tk = [a.tk for a in X]
+        cs = PiecewiseConstant(tk[3:end], xdata[4:end])
+        push!(cpost.xi, cs)
+    end
+end
+
+function make_measured_occupancy(cpost::CalPost)
+    m = cpost.c.graph.m
+    cpost.mocc = Array{Union{Missing,Samples}, 1}(missing, m)
+    for link in cpost.c.links
+        tk = cpost.meas[link.dst].x
+        mo = [beta(link, t, cpost.theta) for t in tk]
+        cpost.mocc[link.id] = Samples(tk, mo)
+    end
 end
 
 function get_occ_samples(c, theta, times)
@@ -39,55 +108,93 @@ function get_occ_samples(c, theta, times)
     return occ
 end
 
-function parse_callisto_log(c, Tdata, theta)
-    p = c.poll_period
-    d = c.control_delay
-    n = c.graph.n
-    m = c.graph.m
 
-    meas = Samples[]
+Base.@kwdef mutable struct FastPost
+    c
+    simlog
+    sorted_data
+    start_ind_by_node
+    theta
+    freq = nothing
+    meas = nothing
+    xi = nothing
+    mocc = nothing
+end
+
+invert_header(simlog, fieldname) = findfirst(x -> x == fieldname, simlog.header)
+
+function FastPost(c, simlog, theta)
+    nid_row = invert_header(simlog, "nid")
+    n = num_records(simlog)
+    p = sortperm(simlog.data[nid_row,1:n])
+    sorted_data = simlog.data[:,p]
+    start_ind_by_node = [1]
+    nid = 2
+    for k=1:n
+        if sorted_data[nid_row, k] == nid
+            push!(start_ind_by_node, k)
+            nid += 1
+        end
+    end
+    push!(start_ind_by_node, n+1)
+    fpost = FastPost(; c, simlog, sorted_data, start_ind_by_node, theta)
+end
+
+function get_all_data(fpost::FastPost, fieldname, nid)
+    field_row = invert_header(fpost.simlog, fieldname)
+    return fpost.sorted_data[field_row, fpost.start_ind_by_node[nid]:fpost.start_ind_by_node[nid+1]-1]
+end
+
+
+function make_frequencies(fpost::FastPost)
+    n = fpost.c.graph.n
+    fpost.freq = PiecewiseConstant[]
     for i=1:n
-        X = get_records(Tdata, x -> x.nid == i)
-        mdata = [a.meas for a in X]
-        tk = [a.tk for a in X]
+        fq = get_all_data(fpost, "freq", i)
+        sk = get_all_data(fpost, "sk", i)
+        push!(fpost.freq, PiecewiseConstant(sk, fq[1:end-1]))
+    end
+end
+
+    
+function make_measurements(fpost::FastPost)
+    n = fpost.c.graph.n
+    fpost.meas = Samples[]
+    for i=1:n
+        mdata = get_all_data(fpost, "meas", i)
+        tk = get_all_data(fpost, "tk", i)
         sam = Samples(tk[3:end], mdata[3:end])
-        push!(meas, sam)
+        push!(fpost.meas, sam)
     end
-
-    # at time tk the controller state
-    # changes from xi(k) to xi(k+1)
-    xi = PiecewiseConstant[]
-    for i=1:n
-        X = get_records(Tdata, x -> x.nid == i)
-        xdata = [a.xi for a in X]
-        tk = [a.tk for a in X]
-        #cs = PiecewiseConstant(tk[3:end], xdata[3:end-1])
-        cs = PiecewiseConstant(tk[3:end], xdata[4:end])
-        push!(xi, cs)
-    end
-
-
-    # construct occupancies at measurement times
-    mocc = Array{Union{Missing,Samples}, 1}(missing, m)
-    for link in c.links
-        tk = meas[link.dst].x
-        mo = [beta(link, t, theta) for t in tk]
-        mocc[link.id] = Samples(tk, mo)
-    end
-    return meas, xi, mocc
 end
 
+function make_measured_occupancy(fpost::FastPost)
+    m = fpost.c.graph.m
+    fpost.mocc = Array{Union{Missing,Samples}, 1}(missing, m)
+    for link in fpost.c.links
+        tk = fpost.meas[link.dst].x
+        mo = [beta(link, t, fpost.theta) for t in tk]
+        fpost.mocc[link.id] = Samples(tk, mo)
+    end
+end
+    
+function fast_post_process(c, simlog, theta)
+    fpost = FastPost(c, simlog, theta)
+    make_frequencies(fpost)
+    make_measurements(fpost)
+    make_measured_occupancy(fpost)
+    return fpost
+end
 
+    
 function parse_callisto_logx(c, simlog, theta)
-    Tdata = make_tuples(simlog)
-    freq = get_freq(c, Tdata)
-    meas, xi, mocc = parse_callisto_log(c, Tdata, theta)
-    adjusted_freqs = [ 10^9*(f + (-1)) for f in freq]
-
-    return (simlog=simlog, theta=theta, freq=freq, meas=meas,
-            afreq=adjusted_freqs, xi=xi, mocc=mocc)
+    cpost = CalPost(c, simlog, theta)
+    make_frequencies(cpost)
+    make_measurements(cpost)
+    make_controller_state(cpost)
+    make_measured_occupancy(cpost)
+    return cpost
 end
-
 
 # things that take a long time we only apply to a time range
 function get_occ(c, theta, tmin, tmax)
@@ -169,6 +276,8 @@ function getdata(t, c, xc)
          omega  = getomega(t, xc))
     return d
 end
+
+
 
 
 end
