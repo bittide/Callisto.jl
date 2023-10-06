@@ -14,7 +14,7 @@ import ..SimCore:    beta, local_to_realtime
 const USE_HEAP = true
 
 # also needed in opts.jl
-const USE_SUM_MEASUREMENT = true
+const USE_SUM_MEASUREMENT = false
 ##############################################################################
 
 function clog(slog, sk, nid, freq)
@@ -58,7 +58,7 @@ function Gx(i, theta, s, theta0, p, links, incoming, d, betafn, slog)
             y += meas(links[e], t, theta, betafn)
         end
     else
-        y = [ (e, meas(links[e], t, theta, betafn), t) for e in incoming[i]]
+        y = [ (e, meas(links[e], t, theta, betafn), t, theta) for e in incoming[i]]
     end
     return y
 end

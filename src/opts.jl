@@ -10,13 +10,13 @@ import ..SimCore: Error, beta
 
 
 # also needed in sim.jl
-const USE_SUM_MEASUREMENT = true
+const USE_SUM_MEASUREMENT = false
 
 """
    Link structure
 
 """
-struct Link
+mutable struct Link
     id
     src
     dst
@@ -191,6 +191,8 @@ function CalOpts(;topology = ("mesh", 3, 2), graph = nothing,
         gears = ones(g.m)
     end
 
+
+    
     function make_link(e)
         return Link(e, g.edges[e].src, g.edges[e].dst,
                     make_ugn(beta0[e], gears[e], latency[e], theta0[g.edges[e].src],
