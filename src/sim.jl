@@ -14,7 +14,7 @@ import ..SimCore:    beta, local_to_realtime
 const USE_HEAP = true
 
 # also needed in opts.jl
-const USE_SUM_MEASUREMENT = false
+const USE_SUM_MEASUREMENT = true
 ##############################################################################
 
 function clog(slog, sk, nid, freq)

@@ -10,7 +10,7 @@ import ..SimCore: Error, beta
 
 
 # also needed in sim.jl
-const USE_SUM_MEASUREMENT = false
+const USE_SUM_MEASUREMENT = true
 
 """
    Link structure
