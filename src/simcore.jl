@@ -73,6 +73,11 @@ end
 
 beta((;ugn, src, dst, latency, gear), t, theta) = ugn + floor(gear*theta[src](t - latency)) - floor(gear*theta[dst](t))
 
+#function beta((;ugn, src, dst, latency, gear), t, theta)
+#    println((;t, src, dst))
+#    return ugn + floor(gear*theta[src](t - latency)) - floor(gear*theta[dst](t))
+#end
+
 gamma((;src, dst, latency, gear), t, theta) = floor(gear*theta[src](t)) - floor(gear*theta[src](t-latency))
 
 

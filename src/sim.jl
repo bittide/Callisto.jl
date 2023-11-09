@@ -49,7 +49,6 @@ function Gx(i, theta, s, theta0, p, links, incoming, d, betafn, slog)
     # following two approaches are both fine
     # t = invert(theta[i], theta[i].y[end] - d)
     t = invert(theta[i], theta0[i] + k*p)
-
     llog(slog, 2, k)
     llog(slog, 5, t)
     if USE_SUM_MEASUREMENT
@@ -145,6 +144,11 @@ function callisto(tmax, epoch, num_nodes, links, incoming, p, d, errors,
         ds = local_to_realtime(errors[i], p, c, s, wmin)
         w = c + errors[i](s)
         clog(slog, theta[i].x[end], i, w)
+        if c + errors[i](s) <= 0
+            println("Frequency at node $i has become negative: omega = ", c + errors[i](s))
+            println("time s = ", s)
+            return slog, theta
+        end
         #@assert c + errors[i](s) > 0
         F(i, theta, ds)
         if USE_HEAP
