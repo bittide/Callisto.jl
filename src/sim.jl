@@ -14,7 +14,9 @@ import ..SimCore:    beta, local_to_realtime
 const USE_HEAP = true
 
 # also needed in opts.jl
-const USE_SUM_MEASUREMENT = true
+# This is useful for very large simulations
+# where we give up flexibility and logging for speed
+const USE_SUM_MEASUREMENT = false
 ##############################################################################
 
 function clog(slog, sk, nid, freq)
