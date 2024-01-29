@@ -46,6 +46,11 @@ meas(link, t, theta, betafn) = (betafn(link, t, theta) - link.offset)/link.gear
 ##############################################################################
 
 function Gx(i, theta, s, theta0, p, links, incoming, d, betafn, slog)
+    #
+    # This means in particular that sampling always starts
+    # off roughly in phase across all nodes. Perhaps we should have
+    # an option where we can test different initial phasing.
+    #
     k = round((theta[i].y[end] - d - theta0[i])/p)
 
     # following two approaches are both fine
