@@ -101,7 +101,8 @@ function get_occ_samples(c, theta, times)
         mo = zeros(length(times))
         for r = 1:length(times)
             t = times[r]
-            mo[r] =  beta(dst, src, e, t, theta, c.ugn, c.latency, c.gears)
+            #mo[r] =  beta(dst, src, e, t, theta, c.ugn, c.latency, c.gears)
+            mo[r] =  beta(c.links[e], t, theta)
         end
         occ[e] = Samples(times, mo)
     end
