@@ -59,6 +59,7 @@ Possible topologies include
  - ("mesh", 3, 4)        A mesh graph with 3x4 nodes
  - ("full", n)           Complete graph
  - ("line", n)           Line graph with n nodes
+ - ("cycle", n)          Cycle graph with n nodes
  - ("hypercube", d)      Hypercube graph of order d
  - ("star", d)           Star graph with n+1 vertices
  - ("torus2d", x, y)     Torus 2d with side lengths x,y
@@ -297,6 +298,15 @@ function get_topology(topology)
         for i=2:n
             push!(edges, edge(i-1,i))
         end
+        layout = meshlayout(n,1)
+
+    elseif topology[1] == "cycle"
+        n = topology[2]
+        edges = Any[]
+        for i=2:n
+            push!(edges, edge(i-1,i))
+        end
+        push!(edges, edge(n, 1))
         layout = meshlayout(n,1)
 
     elseif topology[1] == "hypercube"
