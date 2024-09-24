@@ -109,17 +109,28 @@ function initial_statex(i, epoch, freq_m2, freq_m1, theta0, d, slog)
     return theta_i
 end
 
+function check(d, p, w, n, tmax)
+    @assert d < p
+    
+    avgfreq = sum(w)/n
+    if avgfreq*tmax/p < 10
+        println("Warning; fewer than 10 steps per node in simulation")
+    end
+
+    relmadf = sum(abs.(w .- avgfreq))/avgfreq
+    if relmadf < 1e-9
+        println("Warning: frequencies are very close together. Expect strange behavior.")
+    end
+
+end
 
 function callisto(tmax, epoch, num_nodes, links, incoming, p, d, errors,
                   theta0, freq_m2, freq_m1, wmin, betafn,
                   controller_init, controller_next, controller_log,
                   special, stopper, sim_is_done)
 
-        
-    @assert d < p
-    if tmax/p < 10
-        println("Warning; tmax < 10 * poll_period")
-    end
+    check(d, p, errors(0), num_nodes, tmax)
+    
     
     header = ["ltype", "k", "sk", "nid", "tk", "freq", "meas", "xi"]
     slog = Log(8,header)

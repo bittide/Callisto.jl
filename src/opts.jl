@@ -27,6 +27,60 @@ mutable struct Link
     offset
 end
 
+
+mutable struct Report
+    avgfreq
+    niters
+    expected_log_length
+    expected_time
+    latencies
+    ugns
+    beta0
+    initial_frames_on_link
+end
+
+function Base.show(io::IO, r::Report)
+    f(x) = round(x; sigdigits = 2)
+    g(x, y) = println(io, rpad(x, 30), "= ", y)
+
+    g("expected log length", r.expected_log_length)
+    g("expected run time", f(r.expected_time))
+    g("latencies", f.(r.latencies))
+    g("ugns", r.ugns)
+    g("initial buffer occupancies", r.beta0)
+    g("initial link occupancies", r.initial_frames_on_link)
+end
+
+function Report(graph, errors, poll_period, tmax, links, theta0, wm2)
+    n = graph.n
+    m = graph.m
+    # expected simulation time
+    avgfreq = sum(errors(0))/n
+    niters = Int.(round.(avgfreq * n * tmax / poll_period))
+    expected_log_length = niters + 3*n
+    expected_time = expected_log_length * 5e-6
+    latencies = [l.latency for l in links]
+    ugns = [Int(l.ugn) for l in links]
+    beta0 = [Int(l.beta0) for l in links]
+
+    initial_frames_on_link = [Int(get_initial_frames_on_link(links[e].gear,
+                                                         links[e].latency,
+                                                         theta0[graph.edges[e].src],
+                                                         wm2[graph.edges[e].src]))
+                              for e=1:m]
+                                                         
+    
+    r = Report(avgfreq,
+               niters,
+               expected_log_length,
+               expected_time,
+               latencies,
+               ugns,
+               beta0,
+               initial_frames_on_link)
+    return r
+end
+
 """
     CalOpts structure
 
@@ -53,6 +107,7 @@ mutable struct CalOpts
     special
     stopper
     sim_is_done
+    report
 end
 
 
@@ -94,6 +149,10 @@ function make_ugn(beta0, gear, latency, theta0_at_src,  wm2_at_src, theta0_at_ds
     return beta0 - floor(gear*(theta0_at_src - latency * wm2_at_src)) + floor(gear*theta0_at_dst)
 end
 
+
+function get_initial_frames_on_link(gear, latency, theta0_at_src,  wm2_at_src)
+    return  floor(gear*theta0_at_src) - floor(gear*(theta0_at_src - latency * wm2_at_src)) 
+end
 
 function make_frequencies(seed, num_nodes)
     rng = Random.Xoshiro(seed)
@@ -245,8 +304,12 @@ function CalOpts(;topology = ("mesh", 3, 2), graph = nothing,
         betafn = beta
     end
 
+    
     sim_is_done = (stopper, s, i, f) -> false
-    stopper = 0 
+    stopper = 0
+
+    report = Report(g, errors, poll_period, tmax, links, theta0, wm2)
+    
     c = CalOpts(g,
                 links,
                 tmax,
@@ -267,7 +330,8 @@ function CalOpts(;topology = ("mesh", 3, 2), graph = nothing,
                 controller_log,
                 special,
                 stopper,
-                sim_is_done
+                sim_is_done,
+                report
                 )
 
     return c
