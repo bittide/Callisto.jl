@@ -45,14 +45,22 @@ meas(link, t, theta, betafn) = (betafn(link, t, theta) - link.offset)/link.gear
 
 ##############################################################################
 
+# measurement
 function Gx(i, theta, s, theta0, p, links, incoming, d, betafn, slog)
     #
     # This means in particular that sampling always starts
     # off roughly in phase across all nodes. Perhaps we should have
     # an option where we can test different initial phasing.
     #
+    # That is, the first measurement at node i always
+    # happens at physical time t = 0, and so the first sample
+    # must happen at physical time t =  d/omega[i]_{-1}
+    #
+    #
     k = round((theta[i].y[end] - d - theta0[i])/p)
 
+    # Now we compute the physical time t at which the buffer occupancy is measured.
+    # 
     # following two approaches are both fine
     # t = invert(theta[i], theta[i].y[end] - d)
     t = invert(theta[i], theta0[i] + k*p)
@@ -76,7 +84,10 @@ function sum_or_missing(x)
     return sum(x)
 end
 
-# note controller cannot exactly implement PI, since it does not know t
+# Compute the controller actions, i.e. the correction
+#
+# Note that the controller cannot exactly implement PI, since it does not know t
+#
 function Cx(i, y, controller_states, controller_next, controller_log, slog)
     if USE_SUM_MEASUREMENT
         llog(slog, 7, y)
@@ -110,7 +121,9 @@ function initial_statex(i, epoch, freq_m2, freq_m1, theta0, d, slog)
 end
 
 function check(d, p, w, n, tmax)
-    @assert d < p
+    # I don't see any theoretical or practical reason
+    # for this restriction.
+    # @assert d < p
     
     avgfreq = sum(w)/n
     if avgfreq*tmax/p < 10
@@ -157,18 +170,24 @@ function callisto(tmax, epoch, num_nodes, links, incoming, p, d, errors,
         else
             s, i  = findmin([theta[j].x[end] for j=1:num_nodes])
         end
-        y = G(i, theta, s)
-        c = C(i, y)
+        y = G(i, theta, s)          # make measurement
+        c = C(i, y)                 # compute correction
+
+        # If the error is constant, then 
+        #   ds = p / (c + e.const_error)
+        #
+        # This is the physical time between the current control action
+        # and the next one.
         ds = local_to_realtime(errors[i], p, c, s, wmin)
-        w = c + errors[i](s)
+        
+        w = c + errors[i](s)    # only used for log and termination
         clog(slog, theta[i].x[end], i, w)
         if c + errors[i](s) <= 0
             println("Frequency at node $i has become negative: omega = ", c + errors[i](s))
             println("time s = ", s)
             return slog, theta
         end
-        #@assert c + errors[i](s) > 0
-        F(i, theta, ds)
+        F(i, theta, ds)    # extend theta by a linear segment of length (ds, poll_period)
         if USE_HEAP
             update!(h, i, theta[i].x[end])
         end
