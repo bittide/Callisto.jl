@@ -28,6 +28,9 @@ using .Sim
 include("post.jl")
 using .Post
 
+# depends on post
+include("fastpostproc.jl")
+using .FastPostProc
 
 #------------------------------------------------------------------------------
 # re-exports from piecewise
@@ -63,12 +66,13 @@ export callisto
 #------------------------------------------------------------------------------
 # exports from post.jl
 
-export parse_callisto_log, parse_callisto_logx, focused_callisto_info, get_freq
-export getlatency, getlambda, getbeta, getomega, getdata
-export CalPost, FastPost, make_frequencies, make_measurements, make_measured_occupancy, fast_post_process
+export parse_callisto_logx, focused_callisto_info
 
 
+#------------------------------------------------------------------------------
+# exports from fastpost
 
+export  FastPost, fast_post_process, quick_post
 
 
 end

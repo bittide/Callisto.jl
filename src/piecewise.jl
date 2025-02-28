@@ -195,6 +195,9 @@ function interpolate(x::Vector, y::Vector, t)
     if x[i] == t
         return y[i]
     end
+    if i == length(x)
+        println("x[end] = ", x[end])
+    end
     @assert i != length(x)
     return interpolate(x[i], y[i], x[i+1], y[i+1], t)
 end
