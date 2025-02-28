@@ -209,7 +209,7 @@ end
 Return the list of edges outgoing from each node
 
 For each node `i`,  `outgoing_edges[i]` is a list of the edge ids
-that either start or end at `i`
+that either start or end at `i`. These are sorted by edgeid.
 """
 function get_outgoing_edges(edges, n)
     outgoing_edges = [Int64[] for i=1:n]
@@ -227,7 +227,7 @@ end
 Return the list of edges incoming to each node
 
 For each node `i`,  `incoming_edges[i]` is a list of the edge ids
-that end at `i`
+that end at `i`. These are sorted by edgeid.
 """
 function get_incoming_edges(edges, n)
     incoming_edges = [Int64[] for i=1:n]
