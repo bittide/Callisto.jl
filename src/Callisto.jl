@@ -56,7 +56,7 @@ export beta, gamma
 #------------------------------------------------------------------------------
 # exports from opts.jl
 
-export CalOpts
+export CalOpts, set_controller
 
 #------------------------------------------------------------------------------
 # exports from sim.jl

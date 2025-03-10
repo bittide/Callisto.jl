@@ -24,15 +24,15 @@ The source data here consists of `edges` and `n`. Apart from `topology`,
 everything else is computed from those two quantities.
 """
 mutable struct Graph
-    edges               # list of named tuples, numbered 1,...,m, where m = length(edges)
-    n                   # number of nodes. Nodes are numbered 1,...,n
-    m                   # number of edges
-    incidence           # n by m incidence matrix
+    edges::Vector{@NamedTuple{src::Int64, dst::Int64}}               # list of named tuples, numbered 1,...,m, where m = length(edges)
+    n::Int64                   # number of nodes. Nodes are numbered 1,...,n
+    m::Int64                   # number of edges
+    incidence::Matrix{Int64}           # n by m incidence matrix
     fundamental_cycles  # m by (m-n+1) matrix whose cols are the fcycles
-    incoming_nodes      # incoming_nodes[i] is a list of incoming neighbors of i
-    adjacent_edges      # adjacent_edges[i] is a list of edges that connect to node i
-    outgoing_edges      # outgoing_edges[i] is a list of edges that depart from node i
-    incoming_edges      # incoming_edges[i] is a list of edges which arrive at node i
+    incoming_nodes::Vector{Vector{Int64}}     # incoming_nodes[i] is a list of incoming neighbors of i
+    adjacent_edges::Vector{Vector{Int64}}    # adjacent_edges[i] is a list of edges that connect to node i
+    outgoing_edges::Vector{Vector{Int64}}      # outgoing_edges[i] is a list of edges that depart from node i
+    incoming_edges::Vector{Vector{Int64}}     # incoming_edges[i] is a list of edges which arrive at node i
     topology            # tuple
     layout              # a list of tuples giving coordinates in the plane
 end

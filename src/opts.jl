@@ -1,7 +1,7 @@
 
 module Opts
 
-export CalOpts
+export CalOpts, set_controller
 
 using Random
 
@@ -17,14 +17,14 @@ const USE_SUM_MEASUREMENT = false
 
 """
 mutable struct Link
-    id
-    src
-    dst
-    ugn
-    latency
-    gear
-    beta0
-    offset
+    id::Int64
+    src::Int64
+    dst::Int64
+    ugn::Int64
+    latency::Float64
+    gear::Int64
+    beta0::Int64
+    offset::Float64
 end
 
 
@@ -335,6 +335,14 @@ function CalOpts(;topology = ("mesh", 3, 2), graph = nothing,
                 )
 
     return c
+end
+
+
+
+function set_controller(c::CalOpts, controller_init, controller_next, controller_log)
+    c.controller_init = controller_init
+    c.controller_next = controller_next
+    c.controller_log = controller_log
 end
 
 # 

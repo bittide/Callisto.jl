@@ -51,8 +51,8 @@ end
 # They DO include the endpoint.
 # Note length(x) = length(y)
 struct PiecewiseLinear <: Series
-    x
-    y
+    x::Vector{Float64}
+    y::Vector{Float64}
     function PiecewiseLinear(x,y)
         @assert is_increasing(x) "Error: in PiecewiseLinear, x must be increasing."
         @assert length(x) == length(y) "Error: in PiecewiseLinear, length(x) must equal length(y)"
@@ -203,9 +203,9 @@ function interpolate(x::Vector, y::Vector, t)
 end
 
 
-evaluate(p::PiecewiseLinear, t) = interpolate(p.x, p.y, t)
-invert(p::PiecewiseLinear, w) = interpolate(p.y, p.x, w)
-(p::PiecewiseLinear)(t) = evaluate(p, t)
+evaluate(p::PiecewiseLinear, t)::Float64 = interpolate(p.x, p.y, t)
+invert(p::PiecewiseLinear, w)::Float64  = interpolate(p.y, p.x, w)
+(p::PiecewiseLinear)(t)::Float64 = evaluate(p, t)
 
 
 """
