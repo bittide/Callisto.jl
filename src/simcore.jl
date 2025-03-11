@@ -2,7 +2,7 @@
 
 module SimCore
 
-export Error, beta, gamma
+export Error, beta, gamma, initial_error, errorat
 
 import ..Piecewise: PiecewiseLinear, definite_integral
 
@@ -19,7 +19,17 @@ struct PwlError <: Error
     pwl::PiecewiseLinear
 end
 
-Error(x::Number) = ConstError(x)
+
+initial_error(e::Error) = e(0)
+initial_error(e::Float64) = e
+initial_error(e::Vector{T}) where {T <: Error} = e(0)
+initial_error(e::Vector{Float64}) = e
+
+errorat(e::Error, t) = e(t)
+errorat(e::Float64, t) = e
+
+
+Error(x::Number) = x
 Error(p::PiecewiseLinear) = PwlError(p)
 
 (e::ConstError)(t) = e.const_error
@@ -41,8 +51,10 @@ Base.:+(a::ConstError, b::PiecewiseLinear) = Error(a.const_error + b)
 #
 # that is, ds = p / (c + omega_i)
 #
-local_to_realtime(e::ConstError, p, c, s, wmin) = p / (c + e.const_error)
-    
+#local_to_realtime(e::ConstError, p, c, s, wmin) = p / (c + e.const_error)
+local_to_realtime(e::Float64, p, c, s, wmin) = p / (c + e)
+local_to_realtime(e::ConstError, p, c, s, wmin) = local_to_realtime(e.const_error, p, c, s, wmin)
+
 # assume f(a) < 0 and f(b) > 0
 function bisection(f, a, b, tol = 1e-5)
     while true

@@ -6,7 +6,7 @@ export CalOpts, set_controller
 using Random
 
 import ..Topology: Graph
-import ..SimCore: Error, beta
+import ..SimCore: Error, beta, initial_error
 
 
 # also needed in sim.jl
@@ -22,7 +22,7 @@ mutable struct Link
     dst::Int64
     ugn::Int64
     latency::Float64
-    gear::Int64
+    gear::Float64
     beta0::Int64
     offset::Float64
 end
@@ -55,7 +55,7 @@ function Report(graph, errors, poll_period, tmax, links, theta0, wm2)
     n = graph.n
     m = graph.m
     # expected simulation time
-    avgfreq = sum(errors(0))/n
+    avgfreq = sum(initial_error(errors))/n
     niters = Int.(round.(avgfreq * n * tmax / poll_period))
     expected_log_length = niters + 3*n
     expected_time = expected_log_length * 5e-6
@@ -211,22 +211,22 @@ function CalOpts(;topology = ("mesh", 3, 2), graph = nothing,
     # that is, ds = p / (c + omega_i)
     #
     if isnothing(errors)
-        errors_const = make_frequencies(seed, g.n)
-        errors =  [Error(errors_const[i]) for i=1:g.n]
+        errors = make_frequencies(seed, g.n)
+        #errors =  [Error(errors_const[i]) for i=1:g.n]
     end
 
 
     if isa(wm1, Number)
         wm1 = wm1 * ones(g.n)
     elseif isnothing(wm1)
-        wm1 = [ errors[i](0) for i=1:g.n]
+        wm1 = [ initial_error(errors[i]) for i=1:g.n]
     end
 
 
     if isa(wm2, Number)
         wm2 = wm2 * ones(g.n)
     elseif isnothing(wm2)
-        wm2 = [ errors[i](0) for i=1:g.n]
+        wm2 = [ initial_error(errors[i]) for i=1:g.n]
     end
 
 

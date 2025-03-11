@@ -203,9 +203,51 @@ function interpolate(x::Vector, y::Vector, t)
 end
 
 
+
 evaluate(p::PiecewiseLinear, t)::Float64 = interpolate(p.x, p.y, t)
 invert(p::PiecewiseLinear, w)::Float64  = interpolate(p.y, p.x, w)
 (p::PiecewiseLinear)(t)::Float64 = evaluate(p, t)
+
+
+#
+# Here (length(x) - guess) is an upper bound on the smallest index i
+# which which x[i] >= t.  
+#
+function search_sorted_backwards(x::Vector{Float64}, t::Float64, guess::Int64)
+    ub = length(x) - guess
+    if ub < 1 || x[ub] < t
+        ub = length(x)
+    end
+                    
+    for i = ub:-1:1
+        if x[i] <= t
+            return i
+        end
+    end
+    return 0
+end
+
+#
+# Here guess is a bound as in search_sorted_backwards
+#
+function interpolate_with_guess(x::Vector{Float64}, y::Vector{Float64}, t, guess::Int64)
+    i = search_sorted_backwards(x, t, guess)
+    if x[i] == t
+        return y[i]
+    end
+    if i == length(x)
+        println("x[end] = ", x[end])
+    end
+    return interpolate(x[i], y[i], x[i+1], y[i+1], t)
+end
+
+@inline evaluate_with_guess(p::PiecewiseLinear, t, guess::Int64) = interpolate_with_guess(p.x, p.y, t, guess)
+
+
+
+
+
+
 
 
 """

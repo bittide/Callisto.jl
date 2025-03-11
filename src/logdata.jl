@@ -28,7 +28,7 @@ function Log(nfields, header)
     log = Log(nfields, num_preallocated_records, 1, data, header)
 end
 
-function llognext(logobj)
+function llognext(logobj::Log)
     logobj.current_record += 1
     if logobj.current_record > num_allocated_records(logobj)
         if USE_ELASTIC_ARRAYS
@@ -41,7 +41,7 @@ function llognext(logobj)
 end
 
 
-function llog(logobj, ltype, a, b, c, d, e, f, g)
+function llog(logobj::Log, ltype, a, b, c, d, e, f, g)
     record = logobj.current_record
     logobj[1, record] = ltype
     logobj[2, record] = a 
@@ -55,7 +55,7 @@ function llog(logobj, ltype, a, b, c, d, e, f, g)
     return nothing
 end
 
-function llog(logobj, ltype, a, b, c, d, e, f, g, h)
+function llog(logobj::Log, ltype, a, b, c, d, e, f, g, h)
     record = logobj.current_record
     logobj[1, record] = ltype
     logobj[2, record] = a 
@@ -70,7 +70,7 @@ function llog(logobj, ltype, a, b, c, d, e, f, g, h)
     return nothing
 end
 
-function llog(logobj, ind, dat)
+function llog(logobj::Log, ind, dat)
     record = logobj.current_record
     logobj[ind, record] = dat
     return nothing
