@@ -218,7 +218,6 @@ function search_sorted_backwards(x::Vector{Float64}, t::Float64, guess::Int64)
     if ub < 1 || x[ub] < t
         ub = length(x)
     end
-                    
     for i = ub:-1:1
         if x[i] <= t
             return i
@@ -242,7 +241,7 @@ function interpolate_with_guess(x::Vector{Float64}, y::Vector{Float64}, t, guess
 end
 
 @inline evaluate_with_guess(p::PiecewiseLinear, t, guess::Int64) = interpolate_with_guess(p.x, p.y, t, guess)
-
+@inline invert_with_guess(p::PiecewiseLinear, t, guess::Int64) = interpolate_with_guess(p.y, p.x, t, guess)
 
 
 

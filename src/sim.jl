@@ -9,7 +9,7 @@ export callisto
 
 import ..Piecewise:  PiecewiseLinear, invert
 import ..LogData:    Log, llog, llognext
-import ..SimCore:    beta, local_to_realtime
+import ..SimCore:    beta, local_to_realtime, initial_error, errorat
 
 const USE_HEAP = true
 
@@ -142,7 +142,7 @@ function callisto(tmax, epoch, num_nodes, links, incoming, p, d, errors,
                   controller_init, controller_next, controller_log,
                   special, stopper, sim_is_done)
 
-    check(d, p, errors(0), num_nodes, tmax)
+    check(d, p, initial_error(errors), num_nodes, tmax)
     
     
     header = ["ltype", "k", "sk", "nid", "tk", "freq", "meas", "xi"]
@@ -180,9 +180,9 @@ function callisto(tmax, epoch, num_nodes, links, incoming, p, d, errors,
         # and the next one.
         ds = local_to_realtime(errors[i], p, c, s, wmin)
         
-        w = c + errors[i](s)    # only used for log and termination
+        w = c + errorat(errors[i], s)    # only used for log and termination
         clog(slog, theta[i].x[end], i, w)
-        if c + errors[i](s) <= 0
+        if c + errorat(errors[i], s) <= 0
             println("Frequency at node $i has become negative: omega = ", c + errors[i](s))
             println("time s = ", s)
             return slog, theta

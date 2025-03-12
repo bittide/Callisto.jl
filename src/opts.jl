@@ -306,7 +306,7 @@ function CalOpts(;topology = ("mesh", 3, 2), graph = nothing,
 
     
     sim_is_done = (stopper, s, i, f) -> false
-    stopper = 0
+    stopper = nothing
 
     report = Report(g, errors, poll_period, tmax, links, theta0, wm2)
     
