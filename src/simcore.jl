@@ -2,10 +2,51 @@
 
 module SimCore
 
-export Error, beta, gamma, initial_error, errorat
+export Error, beta, gamma, initial_error, errorat, controllerfunctions
 
 import ..Piecewise: PiecewiseLinear, definite_integral
 
+
+abstract type Controller
+end
+
+init(c::Controller) = return
+getlog(c::Controller) = 0.0
+step(c::Controller, i, theta_at_iofc, physical_time_at_iom, indegree, occ_measurements) = 0.0
+
+mutable struct PIController <: Controller
+    kp::Float64
+    ki::Float64
+    xi::Float64
+    poll_period::Int64
+    base_freq::Float64
+end
+
+function init(ctrl::PIController)
+    ctrl.xi = 0
+end
+
+getlog(ctrl::PIController) = ctrl.xi
+
+function sum_some(x::Vector{Float64},n)
+    s = 0.0
+    for i=1:n
+        @inbounds s = s + x[i]
+    end
+    return s
+end
+
+function step(ctrl::PIController, i::Int64,
+                           theta_at_instant_of_freq_change::Float64,
+                           physical_time_at_instant_of_measurement::Float64,
+                           indegree::Int64, occ_measurements::Vector{Float64})
+    #    r = sum(occ_measurements[1:indegree])
+    r = sum_some(occ_measurements, indegree)
+    next_state = ctrl.xi + ctrl.poll_period * r/ctrl.base_freq
+    correction = ctrl.kp*r + ctrl.ki * next_state
+    ctrl.xi = next_state
+    return correction
+end
 
 
 # uncontrolled frequency
@@ -21,12 +62,13 @@ end
 
 
 initial_error(e::Error) = e(0)
-initial_error(e::Float64) = e
+initial_error(e::Number) = e
 initial_error(e::Vector{T}) where {T <: Error} = e(0)
 initial_error(e::Vector{Float64}) = e
 
 errorat(e::Error, t) = e(t)
-errorat(e::Float64, t) = e
+errorat(e::Number, t) = e
+errorat(e::Vector{T}, t) where {T <: Number}  = e
 
 
 Error(x::Number) = x
@@ -52,7 +94,7 @@ Base.:+(a::ConstError, b::PiecewiseLinear) = Error(a.const_error + b)
 # that is, ds = p / (c + omega_i)
 #
 #local_to_realtime(e::ConstError, p, c, s, wmin) = p / (c + e.const_error)
-local_to_realtime(e::Float64, p, c, s, wmin) = p / (c + e)
+local_to_realtime(e::Number, p, c, s, wmin) = p / (c + e)
 local_to_realtime(e::ConstError, p, c, s, wmin) = local_to_realtime(e.const_error, p, c, s, wmin)
 
 # assume f(a) < 0 and f(b) > 0
@@ -93,6 +135,7 @@ beta((;ugn, src, dst, latency, gear), t, theta) = ugn + floor(gear*theta[src](t 
 gamma((;src, dst, latency, gear), t, theta) = floor(gear*theta[src](t)) - floor(gear*theta[src](t-latency))
 
 
+##############################################################################
 
 
 

@@ -2,7 +2,8 @@
 # code for state-space systems
 module StateDynamics
 
-
+using ..SimCore: Controller, SimCore, init, getlog, step
+export controllerfunctions
 
 ##############################################################################
 # asbtract
@@ -258,11 +259,44 @@ pcontroller(c) = StaticStateSystem(u -> c.kp*u) * AverageOccupancyStateSystem()
 getopts(; kw...) = kwtuple(kw)
 kwtuple(opts) = NamedTuple{keys(opts)}(values(opts))
 
-function controllerfunctions(controllers)
-    controller_init = () -> controllers
-    controller_next(i, Klist, measurements) =  (Klist, next(Klist[i], measurements))
-    controller_log(i, Klist) = 0
-    return getopts(; controller_init, controller_next, controller_log)
+#function controllerfunctions(controllers)
+#    controller_init = () -> controllers
+#    controller_next(i, Klist, measurements) =  (Klist, next(Klist[i], measurements))
+#    controller_log(i, Klist) = 0
+#    return getopts(; controller_init, controller_next, controller_log)
+#end
+
+##############################################################################
+
+
+
+mutable struct XController <: Controller
+    K
+    graph
+end
+StateDynamics.init(ctrl::XController) = return
+StateDynamics.getlog(ctrl::XController) = 0
+
+function StateDynamics.step(ctrl::XController, i::Int64,
+                           theta_at_instant_of_freq_change::Float64,
+                           physical_time_at_instant_of_measurement::Float64,
+                           indegree::Int64, occ_measurements::Vector{Float64})
+
+
+    #y = [ (e, meas(links[e], t, theta, betafn), t, theta) for e in incoming[i]]
+
+    incoming = ctrl.graph.incoming_edges
+    y = [ (e,
+           occ_measurements[j],
+           physical_time_at_instant_of_measurement,
+           theta_at_instant_of_freq_change)  # this is normally the whole theta
+          for (j,e) in enumerate(incoming[i])]
+    corr = next(ctrl.K, y)
+    return corr
+end
+
+function controllerfunctions(c, klist)
+    c.controller = [XController(k, c.graph) for k in klist]
 end
 
 

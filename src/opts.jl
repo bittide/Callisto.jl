@@ -6,7 +6,7 @@ export CalOpts, set_controller
 using Random
 
 import ..Topology: Graph
-import ..SimCore: Error, beta, initial_error
+import ..SimCore: Error, beta, initial_error, SimCore
 
 
 # also needed in sim.jl
@@ -55,7 +55,7 @@ function Report(graph, errors, poll_period, tmax, links, theta0, wm2)
     n = graph.n
     m = graph.m
     # expected simulation time
-    avgfreq = sum(initial_error(errors))/n
+    avgfreq = sum(initial_error.(errors))/n
     niters = Int.(round.(avgfreq * n * tmax / poll_period))
     expected_log_length = niters + 3*n
     expected_time = expected_log_length * 5e-6
@@ -99,17 +99,15 @@ mutable struct CalOpts
     wm2
     wmin
     epoch
-    betafn
+    beta_maker
     base_freq
-    controller_init
-    controller_next
-    controller_log
     special
     stopper
-    sim_is_done
     report
+    safe
+    enable_logging
+    controller
 end
-
 
 
 # assume f(a) < 0 and f(b) > 0
@@ -179,11 +177,13 @@ function CalOpts(;topology = ("mesh", 3, 2), graph = nothing,
                  bidirectional = true,
                  base_freq = 1,
                  wmin = 0.1,
-                 betafn = nothing,
+                 beta_maker = nothing,
                  wm1 = nothing, wm2 = nothing,
                  controller_log = nothing,
                  controller_init = nothing, controller_next = nothing,
                  errors=nothing, gears = nothing, beta0 = 50,
+                 safe = true,
+                 enable_logging = true,
                  special = 0)
 
     if !isnothing(graph)
@@ -292,23 +292,14 @@ function CalOpts(;topology = ("mesh", 3, 2), graph = nothing,
         return next_state, correction
     end
 
-    if isnothing(controller_next) 
-        if USE_SUM_MEASUREMENT 
-            controller_next = cnext_sum
-        else
-            controller_next = cnext
-        end
-    end
 
-    if isnothing(betafn)
-        betafn = beta
-    end
-
-    
-    sim_is_done = (stopper, s, i, f) -> false
     stopper = nothing
 
     report = Report(g, errors, poll_period, tmax, links, theta0, wm2)
+
+    controller = [SimCore.PIController(kp, ki, 0.0, poll_period, base_freq) for i=1:g.n]
+                
+
     
     c = CalOpts(g,
                 links,
@@ -323,62 +314,18 @@ function CalOpts(;topology = ("mesh", 3, 2), graph = nothing,
                 wm2,
                 wmin,
                 epoch,
-                betafn,
+                beta_maker,
                 base_freq,
-                controller_init,
-                controller_next,
-                controller_log,
                 special,
                 stopper,
-                sim_is_done,
-                report
+                report,
+                safe,
+                enable_logging,
+                controller
                 )
 
     return c
 end
-
-
-
-function set_controller(c::CalOpts, controller_init, controller_next, controller_log)
-    c.controller_init = controller_init
-    c.controller_next = controller_next
-    c.controller_log = controller_log
-end
-
-# 
-# function nscale(x)
-#     s = repr(x)
-#     if 'e' in s
-#         s = "\\texttt{$s}"
-#     end
-#     return s
-# end
-# 
-# function xprintln(c::CalOpts)
-#     topology = c.graph.topology
-#     if topology[1] == "full" && topology[2] == 2
-#         s = "2 nodes"
-#     elseif topology[1] == "full" && topology[2] == 3
-#         s = "triangle"
-#     else
-#         s = topology[1] * "(" * join(string.(topology[2:end]),", ") *")"
-#     end
-#     println("\\item topology: $s")
-#     println("\\item \$k_P =  $(nscale(c.kp))\$,  \$k_I = $(nscale(c.ki))\$")
-# 
-#     n = c.graph.n
-#     latency = c.links[1].latency
-#     # warning: assumes uniform latency
-#     println("\\item \$\\codestyle{latency} = $(latency)\$")
-# 
-#     println("\\item \$\\codestyle{poll\\_period} = $(c.poll_period)\$")
-# 
-#     #s = "(" * join(repr.(c.errors), ", ") * ")"
-#     #println("\\item \$\\codestyle{uncorrected_frequency} = $s\$")
-#     println("\\item \$\\codestyle{control\\_delay} = $(c.control_delay)\$")
-#     println("\\item \$\\codestyle{theta0} = $(c.theta0)\$")
-# end
-# 
 
 
 

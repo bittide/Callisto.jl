@@ -52,7 +52,7 @@ export resistance
 # exports from simcore.jl
 
 export Error
-export beta, gamma
+export beta, gamma, errorat, initial_error, controllerfunctions
 #------------------------------------------------------------------------------
 # exports from opts.jl
 
