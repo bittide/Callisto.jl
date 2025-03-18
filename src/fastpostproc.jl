@@ -43,9 +43,9 @@ invert_header(simlog, fieldname) = findfirst(x -> x == fieldname, simlog.header)
 
 
 
-function get_all_data(fpost::FastPost, fieldname, nid)
+function get_all_data(fpost::FastPost, fieldname, nid; startoffset=0, endoffset=0)
     field_row = invert_header(fpost.simlog, fieldname)
-    return fpost.sorted_data[field_row, fpost.start_ind_by_node[nid]:fpost.start_ind_by_node[nid+1]-1]
+    return fpost.sorted_data[field_row, (startoffset + fpost.start_ind_by_node[nid]):fpost.start_ind_by_node[nid+1]-1+endoffset]
 end
 
 
@@ -53,13 +53,24 @@ function make_frequencies(fpost::FastPost)
     n = fpost.c.graph.n
     fpost.freq = PiecewiseConstant[]
     for i=1:n
-        fq = get_all_data(fpost, "freq", i)
+        fq = get_all_data(fpost, "freq", i; endoffset=-1)
         sk = get_all_data(fpost, "sk", i)
-        push!(fpost.freq, PiecewiseConstant(sk, fq[1:end-1]))
+        push!(fpost.freq, PiecewiseConstant(sk, fq))
     end
 end
 
 
+    
+function make_controller_state(fpost::FastPost)
+    n = fpost.c.graph.n
+    fpost.xi = PiecewiseConstant[]
+    for i=1:n
+        xdata = get_all_data(fpost, "xi", i)
+        tk = get_all_data(fpost, "tk", i)
+        sam = PiecewiseConstant(tk[3:end], xdata[4:end])
+        push!(fpost.xi, sam)
+    end
+end
     
 function make_measurements(fpost::FastPost)
     n = fpost.c.graph.n
@@ -76,7 +87,8 @@ function make_measured_occupancy(fpost::FastPost)
     m = fpost.c.graph.m
     fpost.mocc = Array{Union{Missing,Samples}, 1}(missing, m)
     for link in fpost.c.links
-        tk = fpost.meas[link.dst].x
+        #tk = fpost.meas[link.dst].x
+        tk = get_all_data(fpost, "tk", link.dst; startoffset=2)
         mo = [beta(link, t, fpost.theta) for t in tk]
         fpost.mocc[link.id] = Samples(tk, mo)
     end
@@ -86,7 +98,7 @@ end
 function fast_post_process(c, simlog, theta)
     fpost = FastPost(c, simlog, theta)
     make_frequencies(fpost)
-    make_measurements(fpost)
+    #make_measurements(fpost)
     make_measured_occupancy(fpost)
     return fpost
 end

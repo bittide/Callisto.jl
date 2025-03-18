@@ -179,8 +179,7 @@ function CalOpts(;topology = ("mesh", 3, 2), graph = nothing,
                  wmin = 0.1,
                  beta_maker = nothing,
                  wm1 = nothing, wm2 = nothing,
-                 controller_log = nothing,
-                 controller_init = nothing, controller_next = nothing,
+                 controller = nothing,
                  errors=nothing, gears = nothing, beta0 = 50,
                  safe = true,
                  enable_logging = true,
@@ -264,13 +263,6 @@ function CalOpts(;topology = ("mesh", 3, 2), graph = nothing,
 
     links = [make_link(e) for e = 1:g.m]
     
-    if isnothing(controller_init)
-        controller_init = () -> 0.0
-    end
-
-    if isnothing(controller_log)
-        controller_log = (i, xi) -> xi
-    end
 
     function cnext(i, xi, measurement)
         if length(measurement) == 0
@@ -297,7 +289,10 @@ function CalOpts(;topology = ("mesh", 3, 2), graph = nothing,
 
     report = Report(g, errors, poll_period, tmax, links, theta0, wm2)
 
-    controller = [SimCore.PIController(kp, ki, 0.0, poll_period, base_freq) for i=1:g.n]
+    if isnothing(controller)
+        controller = [SimCore.PIController(kp, ki, 0.0, poll_period, base_freq) for i=1:g.n]
+    end
+                
                 
 
     

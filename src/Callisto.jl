@@ -32,6 +32,10 @@ using .Post
 include("fastpostproc.jl")
 using .FastPostProc
 
+# depends on post
+#include("slowpost.jl")
+#using .SlowPost
+
 #------------------------------------------------------------------------------
 # re-exports from piecewise
 
