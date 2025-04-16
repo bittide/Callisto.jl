@@ -8,17 +8,16 @@ using Callisto
 using PlotKit
 const pk = PlotKit
 
-plotpath(x) = joinpath(ENV["HOME"], "plots/", x)
-callistox(c) = parse_callisto_logx(c, callisto(c)...)
+callistox(c) = fast_post_process(c, callisto(c)...)
 
 
 pzip(a) = Point.(a)
 tzip(a::Series) = pzip(tuples(a))
 tzip(a::Array)  = pzip.(tuples.(a))
 
-plot(p, f; kwargs...) = save(drawplot(tzip(p) ; kwargs...), f)
-save(d, fn) =  pk.save(d, plotpath(fn), 4)
 
+qsave(d, fn) =  pk.save(d, fn, 4)
+plot(p, fname; kwargs...) =  qsave(draw(Chart(tzip(p); kwargs...)), fname)
 
 
 # simplest run
