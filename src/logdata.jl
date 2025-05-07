@@ -21,7 +21,7 @@ function Log(nfields, header)
     num_preallocated_records = 1000
     if USE_ELASTIC_ARRAYS
         data = ElasticArray{Float64}(undef, nfields, num_preallocated_records)
-        sizehint!(data, nfields, 10^8)
+        sizehint!(data, nfields, 10^5)
     else
         data = zeros(Float64, nfields, num_preallocated_records)
     end
@@ -82,6 +82,7 @@ Base.setindex!(a::Log, v, field, record) = (a.data[field, record] = v)
 num_allocated_records(a::Log) = size(a.data, 2)
 namedtuple(names, values) = NamedTuple{tuple(Symbol.(names)...)}(values)
 snamedtuple(names, values) = NamedTuple{tuple(names...)}(values)
+
 
 function make_tuples(logobj)
     U = logobj.data[:, 1:logobj.current_record-1]

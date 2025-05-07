@@ -48,7 +48,7 @@ function get_all_data(fpost::FastPost, fieldname, nid; startoffset=0, endoffset=
     return fpost.sorted_data[field_row, (startoffset + fpost.start_ind_by_node[nid]):fpost.start_ind_by_node[nid+1]-1+endoffset]
 end
 
-
+# we need to keep logging frequency
 function make_frequencies(fpost::FastPost)
     n = fpost.c.graph.n
     fpost.freq = PiecewiseConstant[]
@@ -60,7 +60,9 @@ function make_frequencies(fpost::FastPost)
 end
 
 
-    
+# this is used only in runcallisto_wandering for checking lyapunov
+# and for something mysterious in balance.jl
+# so this can be removed
 function make_controller_state(fpost::FastPost)
     n = fpost.c.graph.n
     fpost.xi = PiecewiseConstant[]
@@ -71,7 +73,8 @@ function make_controller_state(fpost::FastPost)
         push!(fpost.xi, sam)
     end
 end
-    
+
+# can remove this function as we do not use fpost.meas anywhere
 function make_measurements(fpost::FastPost)
     n = fpost.c.graph.n
     fpost.meas = Samples[]
@@ -83,6 +86,9 @@ function make_measurements(fpost::FastPost)
     end
 end
 
+# we need to keep logging tk
+# this function only uses the logged values of tk
+# and computes beta from theta
 function make_measured_occupancy(fpost::FastPost)
     m = fpost.c.graph.m
     fpost.mocc = Array{Union{Missing,Samples}, 1}(missing, m)

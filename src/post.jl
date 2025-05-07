@@ -5,10 +5,7 @@ module Post
 export focused_callisto_info
 
 
-import ..SimCore:    beta, gamma
-import ..LogData:    make_tuples, get_records, make_records, get_field, make_fieldmap
-import ..Piecewise:  PiecewiseConstant, Samples, delay, after, before, PiecewiseLinear
-
+import ..Piecewise: delay, before, after
 
     
 

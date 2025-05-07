@@ -107,7 +107,7 @@ function Gx(i, theta, s, theta0, p, links, incoming, d, beta_maker, slog, occ_me
     # we know theta0[i] + k*p = theta_at_iofc - d
     physical_time_at_iom = invert_with_guess(theta[i], theta0[i] + k*p, guess2)
     llog(slog, 2, k)
-    llog(slog, 5, physical_time_at_iom)
+    llog(slog, 5, physical_time_at_iom)  # we use this logged value of tk
     indegree = length(incoming[i])
     for (j,e) in enumerate(incoming[i])
         occ_measurements[j] = get_measurement(beta_maker, links[e], physical_time_at_iom,
@@ -139,7 +139,7 @@ function initial_statex(i, epoch, freq_m2, freq_m1, theta0, d, slog)
     theta_values = Float64[theta0 + epoch * freq_m2,          theta0,            theta0 + d]
     theta_i = PiecewiseLinear(sample_times, theta_values)
     clog(slog, -2, epoch, i, freq_m2)
-    clog(slog, -1, 0, i, freq_m1)
+    clog(slog, -1, 0,     i, freq_m1)
     return theta_i
 end
 
@@ -215,7 +215,7 @@ function callisto(slog, tmax, epoch, num_nodes, links, incoming, p, d, errors,
         # This is the physical time between the current control action
         # and the next one.
         ds = local_to_realtime(errors[i], p, c, s, wmin)
-        log_w(slog, errors, i, p, c, s, wmin, theta)
+        log_w(slog, errors, i, p, c, s, wmin, theta) # here is when the log line is updated
         loop_check(checker, c, errors, i, s)
         Fx(i, theta, ds, p)
         done = sim_is_done(stopper, errors, i, p, c, s)
