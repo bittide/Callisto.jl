@@ -1,5 +1,5 @@
 
-module LogCallisto
+module Callisto
 
 using Piecewise
 using LogData
