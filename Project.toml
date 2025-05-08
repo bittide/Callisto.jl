@@ -20,6 +20,17 @@ PlotKitGL = "482ab07a-b082-4a98-80a0-51c2b3942dee"
 PlotKitPlots = "4a6088fd-2bca-4202-9f79-5b97ec764594"
 PlotKitPresentations = "f9707a2b-e5ab-44a8-8753-3bc9bbb10dda"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+Topology = "52998691-69e7-4a84-99f6-e58d9ccf8a6d"
+StateSystems = "23c40dd2-0d34-4c38-b89d-e68691bb192b"
+LogData = "dc9b759f-4b6f-4c6b-8af8-223bef96c6ca"
+Piecewise = "f155f5a3-add7-4ef4-a5de-701ac9c64b07"
+
+
+
+
+
+
+
 
 [compat]
 Cairo = "1.1.1"
