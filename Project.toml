@@ -1,7 +1,7 @@
 name = "Callisto"
 uuid = "4ae4e7f3-3a0d-47fd-9705-768e0f1baff0"
 authors = ["Sanjay Lall <sanjaylall@google.com>"]
-version = "0.1.0"
+version = "0.2.0"
 
 [deps]
 Cairo = "159f3aea-2a34-519c-b102-8c37f9878175"
