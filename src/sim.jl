@@ -1,11 +1,5 @@
 
-
-
 module Sim
-
-#using DataStructures
-#using InteractiveUtils
-
 
 export callisto
 
@@ -16,7 +10,7 @@ struct Checker end
 sim_is_done(stopper::Nothing, errors, i, p, c, s) = false
 
 import ..Piecewise:  PiecewiseLinear, invert, evaluate_with_guess, invert_with_guess
-import ..LogData:    Log, llog, llognext, LogData
+import ..LogData:    Log, log, start_new_record
 import ..SimCore:    beta, local_to_realtime, errorat, SimCore, initial_error, init, getlog, step, Controller
 
 # IOM = instant of measurement
@@ -28,40 +22,15 @@ import ..SimCore:    beta, local_to_realtime, errorat, SimCore, initial_error, i
 
 ##############################################################################
 
-function clog(slog::Log, sk, nid, freq)
-    llog(slog, 1, 1)
-    llog(slog, 3, sk)
-    llog(slog, 4, nid)
-    llog(slog, 6, freq)
-    llognext(slog)
+const log_fields = (; tk=1, mocc=2)
+log_init(m) =  [Log(log_fields) for i=1:m]
+@inline function log_occupancy(slog::Vector{Log}, eid, t, mocc)
+    log(slog[eid], log_fields.tk, t)      
+    log(slog[eid], log_fields.mocc, mocc) 
+    start_new_record(slog[eid])
 end
 
-function clog(slog::Log, k, sk, nid, freq)
-    llog(slog, 1, 1)
-    llog(slog, 2, k)
-    llog(slog, 3, sk)
-    llog(slog, 4, nid)
-    llog(slog, 6, freq)
-    llognext(slog)
-end
-
-clog(slog::Nothing, sk, nid, freq) = return
-clog(slog::Nothing, k, sk, nid, freq) = return
-LogData.llog(x::Nothing, a, b) = return
-
-@inline log_controller(slog::Nothing, controller, occ_measurements, i, indegree) = return 
-
-function log_controller(slog::Log, controller, occ_measurements, i, indegree)
-    llog(slog, 7, sum_or_missing(a for a in occ_measurements[1:indegree]))
-    llog(slog, 8, getlog(controller))
-end
-
-log_w(slog::Nothing, errors, i, p, c, s, wmin, theta) = return
-
-function log_w(slog::Log, errors, i, p, c, s, wmin, theta)
-    w = c + errorat(errors[i], s)    # only used for log and termination
-    clog(slog, theta[i].x[end], i, w)
-end
+##############################################################################
 
 @inline loop_check(ch::Nothing, c, errors, i, s) = return
 
@@ -82,7 +51,8 @@ end
 
 
 @inline function get_measurement(b::Nothing, link, physical_time_at_iom, theta, theta_at_iom, guess1)
-    return (betax(link, physical_time_at_iom, theta, theta_at_iom, guess1) - link.offset)/link.gear
+    #return (betax(link, physical_time_at_iom, theta, theta_at_iom, guess1) - link.offset)/link.gear
+    return betax(link, physical_time_at_iom, theta, theta_at_iom, guess1)
 end
 ##############################################################################
 
@@ -106,13 +76,17 @@ function Gx(i, theta, s, theta0, p, links, incoming, d, beta_maker, slog, occ_me
     # which would be equally good.
     # we know theta0[i] + k*p = theta_at_iofc - d
     physical_time_at_iom = invert_with_guess(theta[i], theta0[i] + k*p, guess2)
-    llog(slog, 2, k)
-    llog(slog, 5, physical_time_at_iom)  # we use this logged value of tk
+
     indegree = length(incoming[i])
     for (j,e) in enumerate(incoming[i])
-        occ_measurements[j] = get_measurement(beta_maker, links[e], physical_time_at_iom,
-                                   theta, theta_at_iom, guess1)
+        link = links[e]
+        mm = get_measurement(beta_maker, link, physical_time_at_iom, theta, theta_at_iom, guess1)
+        occ_measurements[j] = (mm - link.offset)/link.gear
+        log_occupancy(slog, e, physical_time_at_iom, mm)
     end
+    
+
+
     return theta_at_iofc, physical_time_at_iom, indegree
 end
 
@@ -138,8 +112,6 @@ function initial_statex(i, epoch, freq_m2, freq_m1, theta0, d, slog)
     sample_times = Float64[epoch,                             0,                 d/freq_m1]
     theta_values = Float64[theta0 + epoch * freq_m2,          theta0,            theta0 + d]
     theta_i = PiecewiseLinear(sample_times, theta_values)
-    clog(slog, -2, epoch, i, freq_m2)
-    clog(slog, -1, 0,     i, freq_m1)
     return theta_i
 end
 
@@ -208,14 +180,14 @@ function callisto(slog, tmax, epoch, num_nodes, links, incoming, p, d, errors,
                                                            links, incoming, d, beta_maker,
                                                            slog, occ_measurements,
                                                            guess1, guess2)
-        log_controller(slog, controller[i], occ_measurements, i, indegree)
+        
         c::Float64 = step(controller[i], i, theta_at_iofc,
                           physical_time_at_iom, indegree, occ_measurements)
+
         # If the error is constant, then ds = p / (c + e.const_error)
         # This is the physical time between the current control action
         # and the next one.
         ds = local_to_realtime(errors[i], p, c, s, wmin)
-        log_w(slog, errors, i, p, c, s, wmin, theta) # here is when the log line is updated
         loop_check(checker, c, errors, i, s)
         Fx(i, theta, ds, p)
         done = sim_is_done(stopper, errors, i, p, c, s)
@@ -224,27 +196,26 @@ function callisto(slog, tmax, epoch, num_nodes, links, incoming, p, d, errors,
 end
 
 
-
 function callisto(c)
     print("Running callisto: ")
-
+    n = c.graph.n
+    m = c.graph.m
+    
     if c.enable_logging
-        header = ["ltype", "k", "sk", "nid", "tk", "freq", "meas", "xi"]
-        slog = Log(8,header)
+        # todo add recommended log length
+        slog = log_init(m)
     else
         slog = nothing
     end
+    
     if c.safe
         checker = Checker()
     else
         checker = nothing
     end
 
+    maxindegree = maximum([length(c.graph.incoming_edges[i]) for i = 1:n])
 
-    maxindegree = maximum([length(c.graph.incoming_edges[i]) for i = 1:c.graph.n])
-
-
-    
     # callisto cares about only the incoming edges to each node
     @time simlog, theta = callisto(slog, c.tmax, c.epoch, c.graph.n, c.links, c.graph.incoming_edges, c.poll_period, c.control_delay, c.errors, c.theta0, c.wm2, c.wm1, c.wmin, c.special, c.stopper, maxindegree, c.controller, checker, c.beta_maker)
 

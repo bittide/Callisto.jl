@@ -1,20 +1,14 @@
 
-module Callisto
+module LogCallisto
 
-include("piecewise.jl")
-using .Piecewise
+using Piecewise
+using LogData
+using Topology
+using StateSystems
 
-include("logdata.jl")
-using .LogData
-
-include("topology.jl")
-using .Topology
 
 include("simcore.jl")
 using .SimCore
-
-include("statedynamics.jl")
-using .StateDynamics
 
 # depends on SimCore and Topology 
 include("opts.jl")
@@ -32,16 +26,14 @@ using .Post
 include("fastpostproc.jl")
 using .FastPostProc
 
-# depends on post
-#include("slowpost.jl")
-#using .SlowPost
+
 
 #------------------------------------------------------------------------------
 # re-exports from piecewise
 
 export tuples
 export PiecewiseConstant, PiecewiseLinear, Series, Samples
-export integer_crossings, evaluate, differentiate,
+export integer_crossings, evaluate, differentiate, 
     floor, *, +, delay, integrate, after, before, IntegersBetween, stairs,
     xy, limits, crossing, xmax, invert, discontinuities, square, l2norm,
     steady_state, remove_steady_state, integer_crossings_in_interval,

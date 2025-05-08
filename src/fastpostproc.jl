@@ -2,112 +2,42 @@
 module FastPostProc
 
 import ..SimCore:    beta
-import ..LogData:    num_records
-import ..Piecewise:  PiecewiseConstant, Samples
+import ..LogData:    num_records, get_field
+import ..Piecewise:  Samples, differentiate
 
 export  FastPost, fast_post_process, quick_post
-
 
 Base.@kwdef mutable struct FastPost
     c
     simlog
-    sorted_data
-    start_ind_by_node
     theta
     freq = nothing
-    meas = nothing
-    xi = nothing
     mocc = nothing
 end
 
+FastPost(c, simlog, theta) = FastPost(; c, simlog, theta)
 
-function FastPost(c, simlog, theta)
-    nid_row = invert_header(simlog, "nid")
-    n = num_records(simlog)
-    p = sortperm(simlog.data[nid_row,1:n])
-    sorted_data = simlog.data[:,p]
-    start_ind_by_node = [1]
-    nid = 2
-    for k=1:n
-        if sorted_data[nid_row, k] == nid
-            push!(start_ind_by_node, k)
-            nid += 1
-        end
-    end
-    push!(start_ind_by_node, n+1)
-    fpost = FastPost(; c, simlog, sorted_data, start_ind_by_node, theta)
-end
-
-
-invert_header(simlog, fieldname) = findfirst(x -> x == fieldname, simlog.header)
-
-
-
-function get_all_data(fpost::FastPost, fieldname, nid; startoffset=0, endoffset=0)
-    field_row = invert_header(fpost.simlog, fieldname)
-    return fpost.sorted_data[field_row, (startoffset + fpost.start_ind_by_node[nid]):fpost.start_ind_by_node[nid+1]-1+endoffset]
-end
-
-# we need to keep logging frequency
-function make_frequencies(fpost::FastPost)
-    n = fpost.c.graph.n
-    fpost.freq = PiecewiseConstant[]
-    for i=1:n
-        fq = get_all_data(fpost, "freq", i; endoffset=-1)
-        sk = get_all_data(fpost, "sk", i)
-        push!(fpost.freq, PiecewiseConstant(sk, fq))
-    end
-end
-
-
-# this is used only in runcallisto_wandering for checking lyapunov
-# and for something mysterious in balance.jl
-# so this can be removed
-function make_controller_state(fpost::FastPost)
-    n = fpost.c.graph.n
-    fpost.xi = PiecewiseConstant[]
-    for i=1:n
-        xdata = get_all_data(fpost, "xi", i)
-        tk = get_all_data(fpost, "tk", i)
-        sam = PiecewiseConstant(tk[3:end], xdata[4:end])
-        push!(fpost.xi, sam)
-    end
-end
-
-# can remove this function as we do not use fpost.meas anywhere
-function make_measurements(fpost::FastPost)
-    n = fpost.c.graph.n
-    fpost.meas = Samples[]
-    for i=1:n
-        mdata = get_all_data(fpost, "meas", i)
-        tk = get_all_data(fpost, "tk", i)
-        sam = Samples(tk[3:end], mdata[3:end])
-        push!(fpost.meas, sam)
-    end
-end
-
-# we need to keep logging tk
-# this function only uses the logged values of tk
-# and computes beta from theta
-function make_measured_occupancy(fpost::FastPost)
-    m = fpost.c.graph.m
-    fpost.mocc = Array{Union{Missing,Samples}, 1}(missing, m)
-    for link in fpost.c.links
-        #tk = fpost.meas[link.dst].x
-        tk = get_all_data(fpost, "tk", link.dst; startoffset=2)
-        mo = [beta(link, t, fpost.theta) for t in tk]
-        fpost.mocc[link.id] = Samples(tk, mo)
-    end
+function truncate(p, n)
+    T = typeof(p)
+    return T(p.x[1:end-n], p.y[1:end-n])
 end
 
 
 function fast_post_process(c, simlog, theta)
     fpost = FastPost(c, simlog, theta)
-    make_frequencies(fpost)
-    #make_measurements(fpost)
-    make_measured_occupancy(fpost)
+    fpost.freq = truncate.(differentiate.(fpost.theta), 1)
+    fpost.mocc =  [get_mocc(fpost, e) for e=1:c.graph.m]
     return fpost
 end
+
+
+function get_mocc(fpost, e)
+    tk = get_field(fpost.simlog[e], :tk)
+    mocc = get_field(fpost.simlog[e], :mocc)
+    return Samples(tk, mocc)
+end
+
+
 
 
 ##############################################################################
@@ -115,6 +45,9 @@ end
 # This is not approximate, but it only provides equidistant sampled values.
 
 
+# TODO: replace this with something in piecewise that
+# subsamples a Samples object. We don't need the returned
+# Samples object to have equidistant sample points.
 #
 # Sample the value of the occupancy at a given list of times
 #
@@ -137,7 +70,11 @@ function get_occ_samples(c, theta, times)
 end
 
 #
-# compute the sampled frequency by differentiating theta
+# TODO: move this to a generic function in Piecewise
+# that returns derivative values at specific points.
+#
+#
+# compute the sampled frequency by differentiating theta at tvals
 #
 function get_freq_samples(theta, tvals)
     freqs = []
