@@ -68,7 +68,7 @@ export parse_callisto_logx, focused_callisto_info
 #------------------------------------------------------------------------------
 # exports from fastpost
 
-export  FastPost, fast_post_process, quick_post
+export  FastPost, fast_post_process, quick_post, callistox
 
 
 end

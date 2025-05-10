@@ -4,8 +4,9 @@ module FastPostProc
 import ..SimCore:    beta
 import ..LogData:    num_records, get_field
 import ..Piecewise:  Samples, differentiate
+import ..Sim:  callisto
 
-export  FastPost, fast_post_process, quick_post
+export  FastPost, fast_post_process, quick_post, callistox
 
 Base.@kwdef mutable struct FastPost
     c
@@ -38,6 +39,7 @@ function get_mocc(fpost, e)
 end
 
 
+callistox(c) = fast_post_process(c, callisto(c)...)
 
 
 ##############################################################################
