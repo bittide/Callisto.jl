@@ -289,9 +289,9 @@ function CalOpts(;topology = ("mesh", 3, 2), graph = nothing,
 
     report = Report(g, errors, poll_period, tmax, links, theta0, wm2)
 
-    if isnothing(controller)
-        controller = [SimCore.PIController(kp, ki, 0.0, poll_period, base_freq) for i=1:g.n]
-    end
+    #if isnothing(controller)
+    #    controller =  [SimCore.PIController(kp, ki, 0.0, poll_period, base_freq) for i=1:g.n]
+    #end
                 
                 
 

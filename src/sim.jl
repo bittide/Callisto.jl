@@ -1,7 +1,7 @@
 
 module Sim
 
-export callisto
+export callisto, OutputSystem
 
 
 struct Checker end
@@ -9,9 +9,10 @@ struct Checker end
 
 sim_is_done(stopper::Nothing, errors, i, p, c, s) = false
 
-import ..Piecewise:  PiecewiseLinear, invert, evaluate_with_guess, invert_with_guess
-import ..LogData:    Log, log, start_new_record
-import ..SimCore:    beta, local_to_realtime, errorat, SimCore, initial_error, init, getlog, step, Controller
+import ..Piecewise:     PiecewiseLinear, invert, evaluate_with_guess, invert_with_guess
+import ..LogData:       Log, log, start_new_record
+import ..SimCore:       beta, local_to_realtime, errorat, SimCore, initial_error, getlog
+import ..StateSystems:  StateSystems, StateSystem, compose, PIStateSystem, next
 
 # IOM = instant of measurement
 # IOFC = instant of frequency change
@@ -19,6 +20,47 @@ import ..SimCore:    beta, local_to_realtime, errorat, SimCore, initial_error, i
 # also needed in opts.jl
 # This is useful for very large simulations
 # where we give up flexibility and logging for speed
+
+
+##############################################################################
+# This is a static system that converts the list
+# of buffer occupancies into the required scalar for a P or PI controller
+
+function sum_some(x::Vector{Float64},n)
+    s = 0.0
+    for i=1:n
+        @inbounds s = s + x[i]
+    end
+    return s
+end
+
+Base.@kwdef mutable struct OutputSystem <: StateSystem
+    i::Int64
+    indegree::Int64
+    theta_at_iofc::Float64
+    physical_time_at_iom::Float64
+    occ_measurements::Vector{Float64}
+end
+
+function StateSystems.next(K::OutputSystem, measurements)
+    K.occ_measurements = measurements.occ_measurements
+    K.theta_at_iofc = measurements.theta_at_iofc
+    K.physical_time_at_iom = measurements.physical_time_at_iom
+    return sum_some(K.occ_measurements, K.indegree)
+end
+
+function OutputSystem(i, graph)
+    indegree = length(graph.incoming_edges[i])
+    occ_measurements = zeros(indegree)
+    return OutputSystem(; i, indegree, theta_at_iofc = 0.0,
+                        physical_time_at_iom = 0.0, occ_measurements)
+end
+
+function make_controller(i, graph, kp, ki, poll_period, base_freq)
+    K1 = PIStateSystem(kp, ki * poll_period / base_freq)
+    K2 = OutputSystem(i, graph)
+    return compose(K1, K2)
+end
 
 ##############################################################################
 
@@ -84,8 +126,6 @@ function Gx(i, theta, s, theta0, p, links, incoming, d, beta_maker, slog, occ_me
         occ_measurements[j] = (mm - link.offset)/link.gear
         log_occupancy(slog, e, physical_time_at_iom, mm)
     end
-    
-
 
     return theta_at_iofc, physical_time_at_iom, indegree
 end
@@ -160,6 +200,8 @@ function find_soonest_node(theta, n)
     return minval, minind
 end
 
+
+
 function callisto(slog, tmax, epoch, num_nodes, links, incoming, p, d, errors,
                   theta0, freq_m2, freq_m1, wmin, 
                   special, stopper, maxindegree,
@@ -170,19 +212,23 @@ function callisto(slog, tmax, epoch, num_nodes, links, incoming, p, d, errors,
     guess1, guess2 = make_guesses(errors, num_nodes, links, d)
     initial_state(i) = initial_statex(i, epoch, freq_m2[i], freq_m1[i], theta0[i], d, slog)
     theta = [initial_state(i) for i=1:num_nodes]
-
     s = 0.0
     done = false
     while s < tmax && !done
         #s, i  = findmin([theta[j].x[end] for j=1:num_nodes])
         s, i  = find_soonest_node(theta, num_nodes)
+        K = controller[i]
         theta_at_iofc, physical_time_at_iom, indegree = Gx(i, theta, s, theta0, p,
                                                            links, incoming, d, beta_maker,
                                                            slog, occ_measurements,
                                                            guess1, guess2)
-        
-        c::Float64 = step(controller[i], i, theta_at_iofc,
-                          physical_time_at_iom, indegree, occ_measurements)
+        #
+        # constants:        i, indegree
+        # immutable params: theta_at_iofc, physical_time_at_iom
+        # mutable refs:     occ_measurements
+        #
+        measurements = (; occ_measurements, theta_at_iofc, physical_time_at_iom)
+        c::Float64 = next(K, measurements)
 
         # If the error is constant, then ds = p / (c + e.const_error)
         # This is the physical time between the current control action
@@ -212,6 +258,10 @@ function callisto(c)
         checker = Checker()
     else
         checker = nothing
+    end
+
+    if isnothing(c.controller)
+        c.controller = [make_controller(i, c.graph, c.kp, c.ki, c.poll_period, c.base_freq) for i=1:n]
     end
 
     maxindegree = maximum([length(c.graph.incoming_edges[i]) for i = 1:n])
