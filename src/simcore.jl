@@ -123,14 +123,14 @@ function local_to_realtime(e::PwlError, p, c, s, wmin)
 end
 
 
-beta((;ugn, src, dst, latency, gear), t, theta) = ugn + floor(gear*theta[src](t - latency)) - floor(gear*theta[dst](t))
+#beta((;ugn, src, dst, latency, gear), t, theta) = ugn + floor(gear*theta[src](t - latency)) - floor(gear*theta[dst](t))
 
 #function beta((;ugn, src, dst, latency, gear), t, theta)
 #    println((;t, src, dst))
 #    return ugn + floor(gear*theta[src](t - latency)) - floor(gear*theta[dst](t))
 #end
 
-gamma((;src, dst, latency, gear), t, theta) = floor(gear*theta[src](t)) - floor(gear*theta[src](t-latency))
+#gamma((;src, dst, latency, gear), t, theta) = floor(gear*theta[src](t)) - floor(gear*theta[src](t-latency))
 
 
 ##############################################################################
