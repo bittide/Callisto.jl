@@ -11,7 +11,7 @@ sim_is_done(stopper::Nothing, errors, i, p, c, s) = false
 
 import ..Piecewise:     PiecewiseLinear, invert, evaluate_with_guess, invert_with_guess
 import ..LogData:       Log, log, start_new_record
-import ..SimCore:       beta, local_to_realtime, errorat, SimCore, initial_error, getlog
+import ..SimCore:       local_to_realtime, errorat, SimCore, initial_error
 import ..StateSystems:  StateSystems, StateSystem, compose, PIStateSystem, next
 
 # IOM = instant of measurement
@@ -40,25 +40,30 @@ Base.@kwdef mutable struct OutputSystem <: StateSystem
     theta_at_iofc::Float64
     physical_time_at_iom::Float64
     occ_measurements::Vector{Float64}
+    local_offsets::Vector{Float64}
 end
 
 function StateSystems.next(K::OutputSystem, measurements)
     K.occ_measurements = measurements.occ_measurements
     K.theta_at_iofc = measurements.theta_at_iofc
     K.physical_time_at_iom = measurements.physical_time_at_iom
-    return sum_some(K.occ_measurements, K.indegree)
+    return sum_some(K.occ_measurements - K.local_offsets, K.indegree)
 end
 
-function OutputSystem(i, graph)
+# TODO: move offset subtraction into OutputSystem
+function OutputSystem(i, graph, local_offsets)
     indegree = length(graph.incoming_edges[i])
     occ_measurements = zeros(indegree)
     return OutputSystem(; i, indegree, theta_at_iofc = 0.0,
-                        physical_time_at_iom = 0.0, occ_measurements)
+                        physical_time_at_iom = 0.0, occ_measurements, local_offsets)
 end
 
-function make_controller(i, graph, kp, ki, poll_period, base_freq)
+OutputSystem(i, c) = OutputSystem(i, c.graph, make_local_offsets(i, c))
+make_controller(i ,c) = make_controller(i, c.graph, c.kp, c.ki, c.poll_period, c.base_freq, make_local_offsets(i, c))
+
+function make_controller(i, graph, kp, ki, poll_period, base_freq, local_offsets)
     K1 = PIStateSystem(kp, ki * poll_period / base_freq)
-    K2 = OutputSystem(i, graph)
+    K2 = OutputSystem(i, graph, local_offsets)
     return compose(K1, K2)
 end
 
@@ -123,7 +128,7 @@ function Gx(i, theta, s, theta0, p, links, incoming, d, beta_maker, slog, occ_me
     for (j,e) in enumerate(incoming[i])
         link = links[e]
         mm = get_measurement(beta_maker, link, physical_time_at_iom, theta, theta_at_iom, guess1)
-        occ_measurements[j] = (mm - link.offset)/link.gear
+        occ_measurements[j] = mm # (mm - link.offset)/link.gear
         log_occupancy(slog, e, physical_time_at_iom, mm)
     end
 
@@ -241,6 +246,24 @@ function callisto(slog, tmax, epoch, num_nodes, links, incoming, p, d, errors,
     return slog, theta
 end
 
+# return a vector x of length indegree
+# such that x[j] is the offset associated with incoming_edge[i][j]
+# (and zero if j > indegree[i])
+function make_local_offsets(i, gearedoffset, graph)
+    maxindegree = maximum([length(graph.incoming_edges[i]) for i = 1:graph.n])
+    x = zeros(maxindegree)
+    for (j,e) in enumerate(graph.incoming_edges[i])
+        x[j] = gearedoffset[e] 
+    end
+    return x
+end
+
+function make_local_offsets(i, c)
+    gearedoffset = [c.links[e].offset/c.links[e].gear for e = 1:c.graph.m]
+    return make_local_offsets(i, gearedoffset, c.graph)
+end
+
+
 
 function callisto(c)
     print("Running callisto: ")
@@ -260,11 +283,11 @@ function callisto(c)
         checker = nothing
     end
 
-    if isnothing(c.controller)
-        c.controller = [make_controller(i, c.graph, c.kp, c.ki, c.poll_period, c.base_freq) for i=1:n]
-    end
-
     maxindegree = maximum([length(c.graph.incoming_edges[i]) for i = 1:n])
+
+    if isnothing(c.controller)
+        c.controller = [make_controller(i, c) for i=1:n]
+    end
 
     # callisto cares about only the incoming edges to each node
     @time simlog, theta = callisto(slog, c.tmax, c.epoch, c.graph.n, c.links, c.graph.incoming_edges, c.poll_period, c.control_delay, c.errors, c.theta0, c.wm2, c.wm1, c.wmin, c.special, c.stopper, maxindegree, c.controller, checker, c.beta_maker)

@@ -1,16 +1,13 @@
 
 module Opts
 
-export CalOpts, set_controller
+export CalOpts
 
 using Random
 
 import ..Topology: Graph
-import ..SimCore: Error, beta, initial_error, SimCore
+import ..SimCore: Error, initial_error, SimCore
 
-
-# also needed in sim.jl
-const USE_SUM_MEASUREMENT = false
 
 """
    Link structure

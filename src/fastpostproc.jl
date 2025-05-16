@@ -1,7 +1,7 @@
 
 module FastPostProc
 
-import ..SimCore:    beta
+import ..SimCore
 import ..LogData:    num_records, get_field
 import ..Piecewise:  Samples, differentiate
 import ..Sim:  callisto
