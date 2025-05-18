@@ -9,6 +9,10 @@ struct Checker end
 
 sim_is_done(stopper::Nothing, errors, i, p, c, s) = false
 
+using BittideTools
+using JuliaTools
+import ..Opts:          CalOpts
+import ..Topology:      Topology, inport_indexed_from_edge_indexed
 import ..Piecewise:     PiecewiseLinear, invert, evaluate_with_guess, invert_with_guess
 import ..LogData:       Log, log, start_new_record
 import ..SimCore:       local_to_realtime, errorat, SimCore, initial_error
@@ -17,53 +21,33 @@ import ..StateSystems:  StateSystems, StateSystem, compose, PIStateSystem, next
 # IOM = instant of measurement
 # IOFC = instant of frequency change
 
-# also needed in opts.jl
-# This is useful for very large simulations
-# where we give up flexibility and logging for speed
+##############################################################################
+# We use this object to preallocate storage for the measured occupancies
+
+mutable struct Measurement
+    occupancies::Vector{Float64}
+    theta_at_iofc::Float64
+    physical_time_at_iom::Float64
+end
+
+Measurement(x) = Measurement(x, 0, 0)
 
 
 ##############################################################################
+
 # This is a static system that converts the list
 # of buffer occupancies into the required scalar for a P or PI controller
-
-function sum_some(x::Vector{Float64},n)
-    s = 0.0
-    for i=1:n
-        @inbounds s = s + x[i]
-    end
-    return s
-end
-
-Base.@kwdef mutable struct OutputSystem <: StateSystem
-    i::Int64
-    indegree::Int64
-    theta_at_iofc::Float64
-    physical_time_at_iom::Float64
-    occ_measurements::Vector{Float64}
+mutable struct OutputSystem <: StateSystem
     local_offsets::Vector{Float64}
 end
 
-function StateSystems.next(K::OutputSystem, measurements)
-    K.occ_measurements = measurements.occ_measurements
-    K.theta_at_iofc = measurements.theta_at_iofc
-    K.physical_time_at_iom = measurements.physical_time_at_iom
-    return sum_some(K.occ_measurements - K.local_offsets, K.indegree)
-end
-
-# TODO: move offset subtraction into OutputSystem
-function OutputSystem(i, graph, local_offsets)
-    indegree = length(graph.incoming_edges[i])
-    occ_measurements = zeros(indegree)
-    return OutputSystem(; i, indegree, theta_at_iofc = 0.0,
-                        physical_time_at_iom = 0.0, occ_measurements, local_offsets)
-end
-
-OutputSystem(i, c) = OutputSystem(i, c.graph, make_local_offsets(i, c))
+StateSystems.next(K::OutputSystem, measurement) = sum(measurement.occupancies - K.local_offsets)
+OutputSystem(i, c::CalOpts) = OutputSystem(make_local_offsets(i, c))
 make_controller(i ,c) = make_controller(i, c.graph, c.kp, c.ki, c.poll_period, c.base_freq, make_local_offsets(i, c))
 
 function make_controller(i, graph, kp, ki, poll_period, base_freq, local_offsets)
     K1 = PIStateSystem(kp, ki * poll_period / base_freq)
-    K2 = OutputSystem(i, graph, local_offsets)
+    K2 = OutputSystem(local_offsets)
     return compose(K1, K2)
 end
 
@@ -104,7 +88,7 @@ end
 ##############################################################################
 
 # measurement
-function Gx(i, theta, s, theta0, p, links, incoming, d, beta_maker, slog, occ_measurements, guess1, guess2)
+function Gx(i, theta, s, theta0, p, links, incoming, d, beta_maker, slog, measurement, guess1, guess2)
     #
     # This means in particular that sampling always starts
     # off roughly in phase across all nodes. Perhaps we should have
@@ -125,14 +109,15 @@ function Gx(i, theta, s, theta0, p, links, incoming, d, beta_maker, slog, occ_me
     physical_time_at_iom = invert_with_guess(theta[i], theta0[i] + k*p, guess2)
 
     indegree = length(incoming[i])
+    occ = measurement.occupancies
     for (j,e) in enumerate(incoming[i])
         link = links[e]
         mm = get_measurement(beta_maker, link, physical_time_at_iom, theta, theta_at_iom, guess1)
-        occ_measurements[j] = mm # (mm - link.offset)/link.gear
+        occ[j] = mm # (mm - link.offset)/link.gear
         log_occupancy(slog, e, physical_time_at_iom, mm)
     end
-
-    return theta_at_iofc, physical_time_at_iom, indegree
+    measurement.theta_at_iofc = theta_at_iofc
+    measurement.physical_time_at_iom = physical_time_at_iom
 end
 
 function sum_or_missing(x)
@@ -213,7 +198,7 @@ function callisto(slog, tmax, epoch, num_nodes, links, incoming, p, d, errors,
                   controller, checker, beta_maker)
 
     check(d, p, initial_error.(errors), num_nodes, tmax)
-    occ_measurements = zeros(maxindegree)
+    measurement = [Measurement(zeros(length(incoming[i]))) for i = 1:num_nodes]
     guess1, guess2 = make_guesses(errors, num_nodes, links, d)
     initial_state(i) = initial_statex(i, epoch, freq_m2[i], freq_m1[i], theta0[i], d, slog)
     theta = [initial_state(i) for i=1:num_nodes]
@@ -223,17 +208,17 @@ function callisto(slog, tmax, epoch, num_nodes, links, incoming, p, d, errors,
         #s, i  = findmin([theta[j].x[end] for j=1:num_nodes])
         s, i  = find_soonest_node(theta, num_nodes)
         K = controller[i]
-        theta_at_iofc, physical_time_at_iom, indegree = Gx(i, theta, s, theta0, p,
-                                                           links, incoming, d, beta_maker,
-                                                           slog, occ_measurements,
-                                                           guess1, guess2)
+        Gx(i, theta, s, theta0, p,
+           links, incoming, d, beta_maker,
+           slog, measurement[i],
+           guess1, guess2)
         #
         # constants:        i, indegree
         # immutable params: theta_at_iofc, physical_time_at_iom
         # mutable refs:     occ_measurements
         #
-        measurements = (; occ_measurements, theta_at_iofc, physical_time_at_iom)
-        c::Float64 = next(K, measurements)
+        #measurements = (; occ_measurements, theta_at_iofc, physical_time_at_iom)
+        c::Float64 = next(K, measurement[i])
 
         # If the error is constant, then ds = p / (c + e.const_error)
         # This is the physical time between the current control action
@@ -246,21 +231,26 @@ function callisto(slog, tmax, epoch, num_nodes, links, incoming, p, d, errors,
     return slog, theta
 end
 
-# return a vector x of length indegree
-# such that x[j] is the offset associated with incoming_edge[i][j]
-# (and zero if j > indegree[i])
-function make_local_offsets(i, gearedoffset, graph)
-    maxindegree = maximum([length(graph.incoming_edges[i]) for i = 1:graph.n])
-    x = zeros(maxindegree)
-    for (j,e) in enumerate(graph.incoming_edges[i])
-        x[j] = gearedoffset[e] 
-    end
-    return x
-end
 
+
+#
+# above should be local_offsets = [port_indexed_from_edge_indexed(gearedoffset, i) for i = 1:graph.n]
+# 
+#
+# Conversely, if we want to lookup into a vector y of length indegree but we know the edgeid then we do
+#
+#  port_from_edgeid(edgeid, incoming_edges) = findfirst(isequal(edgeid), incoming_edges)
+#
+#
+# don't scale offsets by gears. instead
+# let the user deal with that.
+#
 function make_local_offsets(i, c)
-    gearedoffset = [c.links[e].offset/c.links[e].gear for e = 1:c.graph.m]
-    return make_local_offsets(i, gearedoffset, c.graph)
+    #gearedoffset = [c.links[e].offset/c.links[e].gear for e = 1:c.graph.m]
+    offset = [c.links[e].offset for e = 1:c.graph.m]
+    #local_offset = pad(inport_indexed_from_edge_indexed(c.graph, offset, i), c.graph.maxindegree)
+    local_offset = inport_indexed_from_edge_indexed(c.graph, offset, i)
+    return local_offset
 end
 
 
