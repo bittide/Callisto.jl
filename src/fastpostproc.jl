@@ -47,31 +47,6 @@ callistox(c) = fast_post_process(c, callisto(c)...)
 # This is not approximate, but it only provides equidistant sampled values.
 
 
-# TODO: replace this with something in piecewise that
-# subsamples a Samples object. We don't need the returned
-# Samples object to have equidistant sample points.
-#
-# Sample the value of the occupancy at a given list of times
-#
-function get_occ_samples(c, theta, times)
-    # construct occupancies at measurement times
-    n = c.graph.n
-    m = c.graph.m
-    occ = Array{Union{Missing,Samples}, 1}(missing, m)
-    for e = 1:m
-        src, dst = c.graph.edges[e]
-        mo = zeros(length(times))
-        for r = 1:length(times)
-            t = times[r]
-            #mo[r] =  beta(dst, src, e, t, theta, c.ugn, c.latency, c.gears)
-            mo[r] =  beta(c.links[e], t, theta)
-        end
-        occ[e] = Samples(times, mo)
-    end
-    return occ
-end
-
-#
 # TODO: move this to a generic function in Piecewise
 # that returns derivative values at specific points.
 #

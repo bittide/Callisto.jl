@@ -38,7 +38,7 @@ reexport(Opts)
 reexport(Sim)
 reexport(Post)
 reexport(FastPostProc)
-
+reexport(Piecewise)
 
 
 
