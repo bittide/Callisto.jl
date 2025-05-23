@@ -35,8 +35,8 @@ function CalPost(c, simlog, theta)
     sort!(tuples, by = x -> x.nid)
     start_ind_by_node = [1]
     nid = 2
-    for k=1:length(tuples)
-        if tuples[k].nid == nid
+    for (k, tup) in enumerate(tuples)
+        if tup.nid == nid
             push!(start_ind_by_node, k)
             nid += 1
         end
