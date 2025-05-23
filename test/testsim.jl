@@ -114,7 +114,7 @@ function testcallisto(tmax,
     num_edges = length(edges)
     beta0 = fill(50, num_edges)
     latency = 5000
-    links = [makelink(e, edges[e][1], edges[e][2], beta0[e], theta0, latency, wm2, 1) for e = 1:length(edges)]
+    links = [makelink(e, edges[e][1], edges[e][2], beta0[e], theta0, latency, wm2, 1) for e in eachindex(edges)]
     incoming = get_incoming_edges(edges, num_nodes)
     wmin = 0.1
     
