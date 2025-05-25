@@ -9,14 +9,16 @@ struct Checker end
 
 sim_is_done(stopper::Nothing, errors, i, p, c, s) = false
 
+import ..LogData: Log, log, start_new_record
+import ..Opts: CalOpts
+import ..Piecewise: PiecewiseLinear, evaluate_with_guess, extend_absx_dy, extend_dx_dy,
+    invert, invert_with_guess
+import ..SimCore: SimCore, errorat, initial_error, local_to_realtime
+import ..StateSystems: PIStateSystem, StateSystem, StateSystems, compose, next
+import ..Topology: Topology, inport_indexed_from_edge_indexed
+
 using BittideTools
 using JuliaTools
-import ..Opts:          CalOpts
-import ..Topology:      Topology, inport_indexed_from_edge_indexed
-import ..Piecewise:     PiecewiseLinear, invert, evaluate_with_guess, invert_with_guess
-import ..LogData:       Log, log, start_new_record
-import ..SimCore:       local_to_realtime, errorat, SimCore, initial_error
-import ..StateSystems:  StateSystems, StateSystem, compose, PIStateSystem, next
 
 # IOM = instant of measurement
 # IOFC = instant of frequency change
@@ -63,9 +65,9 @@ end
 
 ##############################################################################
 
-@inline loop_check(ch::Nothing, c, errors, i, s) = return
+@inline check_freq_is_positive(ch::Nothing, c, errors, i, s) = return
 
-function loop_check(ch::Checker, c, errors, i, s)
+function check_freq_is_positive(ch::Checker, c, errors, i, s)
     if c + errorat(errors[i], s) <= 0
         println("Frequency at node $i has become negative: omega = ", c + errors[i](s))
         println("time s = ", s)
@@ -125,17 +127,6 @@ function sum_or_missing(x)
         return -100
     end
     return sum(x)
-end
-
-# This should be preallocated, since we know tmax
-@inline function extend(p::PiecewiseLinear, dx, dy)
-    push!(p.x, p.x[end] + dx)
-    push!(p.y, p.y[end] + dy)
-end
-
-@inline function Fx(i, theta, ds, p)
-    # p/(c+e) is the time interval between s_k and s_{k+1}
-    extend(theta[i], ds, p)
 end
 
 function initial_statex(i, epoch, freq_m2, freq_m1, theta0, d, slog)
@@ -224,7 +215,7 @@ function callisto(slog, tmax, epoch, num_nodes, links, incoming, p, d, errors,
         # This is the physical time between the current control action
         # and the next one.
         ds = local_to_realtime(errors[i], p, c, s, wmin)
-        loop_check(checker, c, errors, i, s)
+        check_freq_is_positive(checker, c, errors, i, s)
         Fx(i, theta, ds, p)
         done = sim_is_done(stopper, errors, i, p, c, s)
     end
