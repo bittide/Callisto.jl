@@ -198,7 +198,7 @@ function callisto(slog, tmax, epoch, num_nodes, links, incoming, p, d, errors,
     while s < tmax && !done
         #s, i  = findmin([theta[j].x[end] for j=1:num_nodes])
         s, i  = find_soonest_node(theta, num_nodes)
-        K = controller[i]
+        
         Gx(i, theta, s, theta0, p,
            links, incoming, d, beta_maker,
            slog, measurement[i],
@@ -209,7 +209,7 @@ function callisto(slog, tmax, epoch, num_nodes, links, incoming, p, d, errors,
         # mutable refs:     occ_measurements
         #
         #measurements = (; occ_measurements, theta_at_iofc, physical_time_at_iom)
-        c::Float64 = next(K, measurement[i])
+        c::Float64 = next(controller[i], measurement[i])
 
         # If the error is constant, then ds = p / (c + e.const_error)
         # This is the physical time between the current control action
