@@ -3,10 +3,10 @@ module Opts
 
 export CalOpts
 
-using Random
+import ..SimCore: Error, SimCore, initial_error
+import Topology: Graph
 
-import ..Topology: Graph
-import ..SimCore: Error, initial_error, SimCore
+using Random
 
 
 """

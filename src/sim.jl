@@ -9,13 +9,13 @@ struct Checker end
 
 sim_is_done(stopper::Nothing, errors, i, p, c, s) = false
 
-import ..LogData: Log, log, start_new_record
 import ..Opts: CalOpts
-import ..Piecewise: PiecewiseLinear, evaluate_with_guess, extend_absx_dy, extend_dx_dy,
-    invert, invert_with_guess
 import ..SimCore: SimCore, errorat, initial_error, local_to_realtime
-import ..StateSystems: PIStateSystem, StateSystem, StateSystems, compose, next
-import ..Topology: Topology, inport_indexed_from_edge_indexed
+import LogData: Log, log, start_new_record
+import Piecewise: PiecewiseLinear, evaluate_with_guess, extend_absx_dy, extend_dx_dy,
+    invert, invert_with_guess
+import StateSystems: StateSystems, PIStateSystem, StateSystem, compose, next
+import Topology: Topology, inport_indexed_from_edge_indexed
 
 using BittideTools
 using JuliaTools
@@ -58,8 +58,8 @@ end
 const log_fields = (; tk=1, mocc=2)
 log_init(m) =  [Log(log_fields) for i=1:m]
 @inline function log_occupancy(slog::Vector{Log}, eid, t, mocc)
-    log(slog[eid], log_fields.tk, t)      
-    log(slog[eid], log_fields.mocc, mocc) 
+    log(slog[eid], log_fields.tk, t)
+    log(slog[eid], log_fields.mocc, mocc)
     start_new_record(slog[eid])
 end
 
@@ -182,9 +182,8 @@ function find_soonest_node(theta, n)
 end
 
 
-
 function callisto(slog, tmax, epoch, num_nodes, links, incoming, p, d, errors,
-                  theta0, freq_m2, freq_m1, wmin, 
+                  theta0, freq_m2, freq_m1, wmin,
                   special, stopper, maxindegree,
                   controller, checker, beta_maker)
 
@@ -198,7 +197,7 @@ function callisto(slog, tmax, epoch, num_nodes, links, incoming, p, d, errors,
     while s < tmax && !done
         #s, i  = findmin([theta[j].x[end] for j=1:num_nodes])
         s, i  = find_soonest_node(theta, num_nodes)
-        
+
         Gx(i, theta, s, theta0, p,
            links, incoming, d, beta_maker,
            slog, measurement[i],
@@ -216,7 +215,7 @@ function callisto(slog, tmax, epoch, num_nodes, links, incoming, p, d, errors,
         # and the next one.
         ds = local_to_realtime(errors[i], p, c, s, wmin)
         check_freq_is_positive(checker, c, errors, i, s)
-        Fx(i, theta, ds, p)
+        extend_dx_dy(theta[i], ds, p)
         done = sim_is_done(stopper, errors, i, p, c, s)
     end
     return slog, theta
@@ -224,9 +223,10 @@ end
 
 
 
+
 #
 # above should be local_offsets = [port_indexed_from_edge_indexed(gearedoffset, i) for i = 1:graph.n]
-# 
+#
 #
 # Conversely, if we want to lookup into a vector y of length indegree but we know the edgeid then we do
 #
@@ -250,14 +250,14 @@ function callisto(c)
     print("Running callisto: ")
     n = c.graph.n
     m = c.graph.m
-    
+
     if c.enable_logging
         # todo add recommended log length
         slog = log_init(m)
     else
         slog = nothing
     end
-    
+
     if c.safe
         checker = Checker()
     else

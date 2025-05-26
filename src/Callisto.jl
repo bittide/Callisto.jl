@@ -1,12 +1,6 @@
 
 module Callisto
 
-using Piecewise
-using LogData
-using Topology
-using StateSystems
-
-
 include("simcore.jl")
 using .SimCore
 
@@ -38,8 +32,6 @@ reexport(Opts)
 reexport(Sim)
 reexport(Post)
 reexport(FastPostProc)
-reexport(Piecewise)
-
 
 
 end

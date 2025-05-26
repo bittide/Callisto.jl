@@ -4,10 +4,7 @@ module Post
 
 export focused_callisto_info
 
-
-import ..Piecewise: delay, before, after
-
-    
+import Piecewise: after, before, delay
 
 ##############################################################################
 # For those who want all the details, use this

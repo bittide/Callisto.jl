@@ -4,16 +4,16 @@ module SimCore
 
 export Error, beta, gamma, initial_error, errorat, controllerfunctions
 
-import ..Piecewise: PiecewiseLinear, definite_integral
+import Piecewise: PiecewiseLinear, definite_integral
 
-# 
+#
 # abstract type Controller
 # end
-# 
+#
 # init(c::Controller) = return
 # getlog(c::Controller) = 0.0
 # step(c::Controller, i, theta_at_iofc, physical_time_at_iom, indegree, occ_measurements) = 0.0
-# 
+#
 # mutable struct PIController <: Controller
 #     kp::Float64
 #     ki::Float64
@@ -21,13 +21,13 @@ import ..Piecewise: PiecewiseLinear, definite_integral
 #     poll_period::Int64
 #     base_freq::Float64
 # end
-# 
+#
 # function init(ctrl::PIController)
 #     ctrl.xi = 0
 # end
-# 
+#
 # getlog(ctrl::PIController) = ctrl.xi
-# 
+#
 # function step(ctrl::PIController, i::Int64,
 #                            theta_at_instant_of_freq_change::Float64,
 #                            physical_time_at_instant_of_measurement::Float64,
@@ -39,7 +39,7 @@ import ..Piecewise: PiecewiseLinear, definite_integral
 #     ctrl.xi = next_state
 #     return correction
 # end
-# 
+#
 
 
 

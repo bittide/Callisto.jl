@@ -1,10 +1,10 @@
 
 module FastPostProc
 
+import ..Sim: callisto
 import ..SimCore
-import ..LogData:    num_records, get_field
-import ..Piecewise:  Samples, differentiate
-import ..Sim:  callisto
+import LogData: get_field, num_records
+import Piecewise: Samples, differentiate
 
 export  FastPost, fast_post_process, quick_post, callistox
 
