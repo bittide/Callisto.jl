@@ -1,9 +1,9 @@
 
 module TestStateDynamics
 
-include("../src/statedynamics.jl")
 
-using .StateDynamics: StateSystem, PIStateSystem, next, StoppingStateSystem, SequentialStateSystem
+
+using StateSystems: StateSystem, PIStateSystem, next, StoppingStateSystem, SequentialStateSystem
 using Test
 
 apply(K::StateSystem, inputs) = [next(K, u) for u in inputs]
@@ -27,7 +27,7 @@ function main2()
     return true
 end
 
-# Verify that PI controllers are P + I 
+# Verify that PI controllers are P + I
 function main3()
     inputs = [1.0, 2, 3, 7]
     Kp = PIStateSystem(3, 0)
@@ -46,7 +46,7 @@ function main4()
     Kpi = PIStateSystem(3, 2)
     K = StoppingStateSystem(koff, Kpi)
     inputs1 = [1.0, 2, 3, 7, 8, 4, 2, 1]
-    # inputs2[t] = 0 for t > koff 
+    # inputs2[t] = 0 for t > koff
     # The input values at those times do not affect the output
     # because by then the system has stopped.
     inputs2 = inputs1 .* [(i <= koff) for i = 1:length(inputs1)]
@@ -82,12 +82,12 @@ function main5()
     return true
 end
 
-    
-    
 
 
 
-    
+
+
+
 function main()
     @testset "Callisto statedynamics" begin
         @test main1()

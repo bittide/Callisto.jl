@@ -1,23 +1,11 @@
 
 module Run
 
-##############################################################################
+
 using Callisto
-##############################################################################
-
 using PlotKit
-const pk = PlotKit
+using StandardPlots
 
-callistox(c) = fast_post_process(c, callisto(c)...)
-
-
-pzip(a) = Point.(a)
-tzip(a::Series) = pzip(tuples(a))
-tzip(a::Array)  = pzip.(tuples.(a))
-
-
-qsave(d, fn) =  pk.save(d, fn, 4)
-plot(p, fname; kwargs...) =  qsave(draw(Chart(tzip(p); kwargs...)), fname)
 
 
 # simplest run
@@ -36,3 +24,6 @@ end
 
 
 end
+
+
+

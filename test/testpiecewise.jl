@@ -2,8 +2,8 @@
 module TestPiecewise
 
 
-include("../src/piecewise.jl")
-using .Piecewise
+
+using Piecewise
 using Test
 
 
@@ -65,7 +65,7 @@ function main99()
     return true
 end
 
-    
+
 function main()
     @testset "Callisto piecewise" begin
         @test main1()
