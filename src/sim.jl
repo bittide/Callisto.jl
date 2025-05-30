@@ -20,38 +20,6 @@ import Topology: Topology, inport_indexed_from_edge_indexed
 using BittideTools
 using JuliaTools
 
-# IOM = instant of measurement
-# IOFC = instant of frequency change
-
-##############################################################################
-# We use this object to preallocate storage for the measured occupancies
-
-mutable struct Measurement
-    occupancies::Vector{Float64}
-    theta_at_iofc::Float64
-    physical_time_at_iom::Float64
-end
-
-Measurement(x) = Measurement(x, 0, 0)
-
-
-##############################################################################
-
-# This is a static system that converts the list
-# of buffer occupancies into the required scalar for a P or PI controller
-mutable struct OutputSystem <: StateSystem
-    local_offsets::Vector{Float64}
-end
-
-StateSystems.next(K::OutputSystem, measurement) = sum(measurement.occupancies - K.local_offsets)
-OutputSystem(i, c::CalOpts) = OutputSystem(make_local_offsets(i, c))
-make_controller(i ,c) = make_controller(i, c.graph, c.kp, c.ki, c.poll_period, c.base_freq, make_local_offsets(i, c))
-
-function make_controller(i, graph, kp, ki, poll_period, base_freq, local_offsets)
-    K1 = PIStateSystem(kp, ki * poll_period / base_freq)
-    K2 = OutputSystem(local_offsets)
-    return compose(K1, K2)
-end
 
 ##############################################################################
 
@@ -81,7 +49,6 @@ end
     phase1 = get_phase(theta[src], t - latency, guess1)
     return ugn + floor(gear*phase1) - floor(gear*theta_at_iom)
 end
-
 
 @inline function get_measurement(b::Nothing, link, physical_time_at_iom, theta, theta_at_iom, guess1)
     #return (betax(link, physical_time_at_iom, theta, theta_at_iom, guess1) - link.offset)/link.gear
@@ -219,29 +186,6 @@ function callisto(slog, tmax, epoch, num_nodes, links, incoming, p, d, errors,
         done = sim_is_done(stopper, errors, i, p, c, s)
     end
     return slog, theta
-end
-
-
-
-
-#
-# above should be local_offsets = [port_indexed_from_edge_indexed(gearedoffset, i) for i = 1:graph.n]
-#
-#
-# Conversely, if we want to lookup into a vector y of length indegree but we know the edgeid then we do
-#
-#  port_from_edgeid(edgeid, incoming_edges) = findfirst(isequal(edgeid), incoming_edges)
-#
-#
-# don't scale offsets by gears. instead
-# let the user deal with that.
-#
-function make_local_offsets(i, c)
-    #gearedoffset = [c.links[e].offset/c.links[e].gear for e = 1:c.graph.m]
-    offset = [c.links[e].offset for e = 1:c.graph.m]
-    #local_offset = pad(inport_indexed_from_edge_indexed(c.graph, offset, i), c.graph.maxindegree)
-    local_offset = inport_indexed_from_edge_indexed(c.graph, offset, i)
-    return local_offset
 end
 
 
