@@ -5,18 +5,8 @@ using Callisto
 using PlotKit
 const pk = PlotKit
 using Random
+using StandardPlots
 
-plotpath(x) = joinpath(ENV["HOME"], "plots/", x)
-callistox(c) = parse_callisto_logx(c, callisto(c)...)
-
-pzip(a) = Point.(a)
-tzip(a::Series) = pzip(tuples(a))
-tzip(a::Array)  = pzip.(tuples.(a))
-
-plot(p, f; kwargs...) = save(drawplot(tzip(p) ; kwargs...), f)
-save(d, fn) =  pk.save(d, plotpath(fn), 4)
-
-getopts(; kw...) = kw
 
 function setup()
     Random.seed!(1)
@@ -25,7 +15,7 @@ function setup()
     max_ppm = 100
     freqs = typical_freq * (1 .+  rand(-max_ppm:max_ppm, num_nodes) /  1e6)
     errors =  [Error(a) for a in freqs]
-    
+
     return getopts(; topology = ["triangle"],
                    latency = 200,
                    errors,
