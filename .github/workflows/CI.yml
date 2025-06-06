@@ -28,22 +28,21 @@ jobs:
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
-          localregistry: https://github.com/username/PersonalRegistry.git
-
-      - name: Checkout 
-        uses: actions/checkout@v4
-        with:
-          repository: bittide/JuliaTools.jl
-
-      - name: Checkout 
-        uses: actions/checkout@v4
-        with:
-          repository: bittide/Piecewise.jl
-
-      - name: Checkout 
-        uses: actions/checkout@v4
-        with:
-          repository: bittide/Topology.jl
+# 
+#       - name: Checkout 
+#         uses: actions/checkout@v4
+#         with:
+#           repository: bittide/JuliaTools.jl
+# 
+#       - name: Checkout 
+#         uses: actions/checkout@v4
+#         with:
+#           repository: bittide/Piecewise.jl
+# 
+#       - name: Checkout 
+#         uses: actions/checkout@v4
+#         with:
+#           repository: bittide/Topology.jl
 
       - uses: julia-actions/cache@v2
       - uses: ./.github/actions/juliarun
