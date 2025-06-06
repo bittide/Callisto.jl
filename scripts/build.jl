@@ -253,7 +253,7 @@ end
 function main_test()
     home = rstrip(ENV["HOME"], ['/', ' '])
     working_dir = joinpath(home, "transfer")
-    package_dir = joinpath(home, "opensource/github/bittide/PlotKit.jl")
+    package_dir = joinpath(home, "opensource/github/bittide/Callisto.jl")
     build_and_test_package(working_dir, package_dir)
 end
 
