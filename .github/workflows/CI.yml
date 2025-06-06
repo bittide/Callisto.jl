@@ -33,16 +33,19 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: bittide/JuliaTools.jl
- 
+          path: JuliaTools.jl
+          
       - name: Checkout 
         uses: actions/checkout@v4
         with:
           repository: bittide/Piecewise.jl
- 
+          path: Piecewise.jl
+
       - name: Checkout 
         uses: actions/checkout@v4
         with:
           repository: bittide/Topology.jl
+          path: Topology.jl
 
       - uses: julia-actions/cache@v2
       - uses: ./.github/actions/juliarun
