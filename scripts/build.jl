@@ -45,10 +45,10 @@ function dev_package(dir_name::String)
         return
     end
     package_name = m[2]
-    if !is_package_installed(package_name)
-        println("Installing (dev): $package_name")
-        Pkg.develop(PackageSpec(path = joinpath(home, dir_name)))
-    end
+    #    if !is_package_installed(package_name)
+    println("Installing (dev): $package_name")
+    Pkg.develop(PackageSpec(path = joinpath(home, dir_name)))
+    #end
 end
 
 function main()
