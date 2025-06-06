@@ -13,4 +13,6 @@ runs:
   using: 'composite'
   steps:
   - run: julia --project=${{ inputs.project }} ${{ inputs.script }}/scripts/build.jl
+    shell: bash
+    
 
