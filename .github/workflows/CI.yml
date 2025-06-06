@@ -29,6 +29,8 @@ jobs:
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
+          localregistry: https://github.com/username/PersonalRegistry.git
       - uses: julia-actions/cache@v2
+      - uses: bittide/JuliaTools.jl/.github/workflows/juliarun.yml
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
