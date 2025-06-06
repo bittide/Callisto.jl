@@ -1,6 +1,7 @@
 
 module Build
 
+using Pkg
 
 local_packages() = ["opensource/github/bittide/JuliaTools.jl",
                     "opensource/github/bittide/PlotKitCairo.jl",
