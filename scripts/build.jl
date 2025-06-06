@@ -41,6 +41,7 @@ function dev_package(dir_name::String)
     home = rstrip(pwd(), ['/', ' '])
     m = match(r"(/)([a-zA-Z0-9]*)(\.jl)", dir_name)
     if isnothing(m)
+        println("Not installing", dir_name)
         return
     end
     package_name = m[2]
