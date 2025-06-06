@@ -2,7 +2,7 @@
 
 module SimCore
 
-export Error, beta, gamma, initial_error, errorat, controllerfunctions
+export Error, Link, beta, gamma, initial_error, errorat, controllerfunctions
 
 import Piecewise: PiecewiseLinear, definite_integral
 
@@ -42,7 +42,16 @@ import Piecewise: PiecewiseLinear, definite_integral
 #
 
 
-
+mutable struct Link
+    id::Int64
+    src::Int64
+    dst::Int64
+    ugn::Int64
+    latency::Float64
+    gear::Float64
+    beta0::Int64
+    offset::Float64
+end
 
 
 

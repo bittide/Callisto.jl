@@ -1,89 +1,9 @@
-
-
 module TestSim
 
-##############################################################################
-module Piecewise
-
-struct PiecewiseLinear 
-    x
-    y
-end
-
-interpolate(x1,y1,x2,y2,d) = ((x2-d)*y1 - (x1-d)*y2)/(x2-x1)
-
-function evaluatepl(x, y, t)
-    # this function returns the largest i such that x[i] <= t
-    i = searchsortedlast(x, t)
-    if x[i] == t
-        return y[i]
-    end
-    @assert i != length(x)
-    return interpolate(x[i], y[i], x[i+1], y[i+1], t)
-end
-
-invert(p::PiecewiseLinear, w) = evaluatepl(p.y, p.x, w)
-(p::PiecewiseLinear)(t) = evaluatepl(p.x, p.y, t)
-
-end
-
-
-##############################################################################
-module LogData
-
-Log(a,b) = return
-llog(a,b,c) =  return
-llognext(a) =  return
-
-end
-
-
-##############################################################################
-module SimCore
-beta((;ugn, src, dst, latency, gear), t, theta) = ugn + floor(gear*theta[src](t - latency)) - floor(gear*theta[dst](t))
-
-
-struct ConstError
-    const_error::Float64
-end
-
-local_to_realtime(e::ConstError, p, c, s, wmin) = p / (c + e.const_error)
-(e::ConstError)(t) = e.const_error
-
-end
-
-
-##############################################################################
-struct Link
-    id
-    src
-    dst
-    ugn
-    latency
-    gear
-    beta0
-    offset
-end
-
-
-##############################################################################
-
-# what we are actually testing
-include("../src/sim.jl")
-using .Sim
-
-function makelink(e, src, dst, beta0, theta0, latency, wm2, gear)
-    ugn = beta0 - floor(gear*(theta0[src] - latency * wm2[src])) + floor(gear*theta0[dst])
-    return Link(e, src, dst, ugn, latency, gear, beta0, beta0)
-end
-
-function get_incoming_edges(edges, n)
-    incoming_edges = [Int64[] for i=1:n]
-    for (i, (src, dst)) in enumerate(edges)
-        push!(incoming_edges[dst], i)
-    end
-    return incoming_edges
-end
+using Piecewise
+using Topology
+using Callisto.Sim
+using Callisto.SimCore
 
 function offsetnormsquared(p::Piecewise.PiecewiseLinear, offset)
     s = 0.0
@@ -96,88 +16,85 @@ function offsetnormsquared(p::Piecewise.PiecewiseLinear, offset)
     return s
 end
 
+function make_ugn(beta0, gear, latency, theta0_at_src,  wm2_at_src, theta0_at_dst)
+    return beta0 - floor(gear*(theta0_at_src - latency * wm2_at_src)) + floor(gear*theta0_at_dst)
+end
+
 function testcallisto(tmax,
-                      epoch,
-                      num_nodes,
-                      edges,
+                      graph,
                       poll_period,
-                      d,
                       kp,
                       ki,
-                      freqs)
-
-
-    theta0 = [0.1, 0.1, 0.1]
-    errors = [SimCore.ConstError(a) for a in freqs]
-    wm2 = copy(freqs)
-    wm1 = copy(freqs)
-    num_edges = length(edges)
-    beta0 = fill(50, num_edges)
+                      errors,
+                      base_freq)
+    m = graph.m
+    n = graph.n
+    theta0 = fill(0.1, n)
+    wm2 = copy(errors)
+    wm1 = copy(errors)
+    beta0 = fill(50, m)
     latency = 5000
-    links = [makelink(e, edges[e][1], edges[e][2], beta0[e], theta0, latency, wm2, 1) for e in eachindex(edges)]
-    incoming = get_incoming_edges(edges, num_nodes)
-    wmin = 0.1
-    
-    controller_init = () -> 0.0
-    function controller_next(i, xi, ml)
-        s = sum(a[2] for a in ml)
-        next_state =  xi + poll_period*s
-        correction =  kp * s +  ki * next_state
-        return next_state, correction
+    gear = 1
+    offset = fill(50, m)
+
+    function make_link(e)
+        src = graph.edges[e].src
+        dst = graph.edges[e].dst
+        ugn = make_ugn(beta0[e], gear, latency, theta0[src], wm2[src], theta0[dst])
+        return Link(e, src, dst, ugn, latency, gear, beta0[e], offset[e])
     end
 
-    slog, theta = callisto(tmax,
-                           epoch,
-                           num_nodes,
-                           links,
-                           incoming,
-                           poll_period,
-                           d,
-                           errors,
-                           theta0, 
-                           wm2,
-                           wm1,
-                           wmin,
-                           controller_init,
-                           controller_next)
+    links = [make_link(e) for e = 1:m]
+    wmin = 0.1
+    epoch = -10*latency
+    control_delay = 1000
+    slog = nothing
+    checker = nothing
+    special = nothing
+    stopper = nothing
+    maxindegree = maximum([length(graph.incoming_edges[i]) for i = 1:n])
+    local_offset(i) = inport_indexed_from_edge_indexed(graph, offset, i)
+    controller = [ Sim.make_controller(i, graph, kp, ki, poll_period, base_freq,
+        local_offset(i)) for i=1:graph.n]
+    beta_maker = nothing
+
+    simlog, theta = callisto(slog, tmax, epoch, graph.n,
+        links, graph.incoming_edges, poll_period, control_delay,
+        errors, theta0, wm2, wm1, wmin, special, stopper,
+        maxindegree, controller, checker, beta_maker)
 
     return theta
 end
 
 
-function main()
+function main1()
     kp = 2e-8
     ki = 1e-15
     tmax = 200e6
-    epoch = -5e4
-    num_nodes = 3
     alpha = 1e-4
     f0 = 1
     freqs = [f0 + alpha, f0-alpha, f0]
-    edges = ( (1,2), (1,3), (2,3), (2,1), (3,1), (3,2))
+    base_freq = f0
+    graph = Topology.Graph(["triangle"]; bidirectional = true)
     poll_period = 100000
-    d = 1000
-    theta =  testcallisto(tmax,
-                          epoch,
-                          num_nodes,
-                          edges,
-                          poll_period,
-                          d,
-                          kp,
-                          ki,                          
-                          freqs)
-
-    @assert all([a.x[end] > tmax for a in theta]) "Error: Callisto simulation did not run for required interval."
+    theta =  testcallisto(tmax, graph, poll_period, kp, ki, freqs, base_freq)
+    end_time_in_range = all([a.x[end] > tmax for a in theta])
     ns = sum(offsetnormsquared(q, f0) for q in theta)
-
     # resistance distance test
     res = 2/3
     expected_ns = alpha^2*res/(2*kp)
-    @assert  0.9 <= ns/expected_ns <= 1.1 "Error: Callisto simulation frequency not within predicted bounds."
-
-    return true
+    norm_of_freq_in_range = 0.9 <= ns/expected_ns <= 1.1
+    return norm_of_freq_in_range && end_time_in_range
 end
-    
+
+function main2()
+   return 1 == 1
+end
+
+function main3()
+    return 1 == 1
+end
+
 
 
 end

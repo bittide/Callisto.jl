@@ -31,6 +31,9 @@ log_init(m) =  [Log(log_fields) for i=1:m]
     start_new_record(slog[eid])
 end
 
+@inline log_occupancy(slog::Nothing, eid, t, mocc) = return
+
+
 ##############################################################################
 
 @inline check_freq_is_positive(ch::Nothing, c, errors, i, s) = return
@@ -215,7 +218,10 @@ function callisto(c)
     end
 
     # callisto cares about only the incoming edges to each node
-    @time simlog, theta = callisto(slog, c.tmax, c.epoch, c.graph.n, c.links, c.graph.incoming_edges, c.poll_period, c.control_delay, c.errors, c.theta0, c.wm2, c.wm1, c.wmin, c.special, c.stopper, maxindegree, c.controller, checker, c.beta_maker)
+    @time simlog, theta = callisto(slog, c.tmax, c.epoch, c.graph.n,
+        c.links, c.graph.incoming_edges, c.poll_period, c.control_delay,
+        c.errors, c.theta0, c.wm2, c.wm1, c.wmin, c.special, c.stopper,
+        maxindegree, c.controller, checker, c.beta_maker)
 
     return (simlog = simlog, theta = theta,)
 end

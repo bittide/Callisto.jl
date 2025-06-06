@@ -3,7 +3,7 @@ module Opts
 
 export CalOpts
 
-import ..SimCore: Error, SimCore, initial_error
+import ..SimCore: Error, Link,  SimCore, initial_error
 import Topology: Graph
 
 using Random
@@ -13,16 +13,7 @@ using Random
    Link structure
 
 """
-mutable struct Link
-    id::Int64
-    src::Int64
-    dst::Int64
-    ugn::Int64
-    latency::Float64
-    gear::Float64
-    beta0::Int64
-    offset::Float64
-end
+
 
 
 mutable struct Report
@@ -65,8 +56,8 @@ function Report(graph, errors, poll_period, tmax, links, theta0, wm2)
                                                          theta0[graph.edges[e].src],
                                                          wm2[graph.edges[e].src]))
                               for e=1:m]
-                                                         
-    
+
+
     r = Report(avgfreq,
                niters,
                expected_log_length,
@@ -128,7 +119,7 @@ end
 
 
 """
-    a tuplmake_ugn(beta0, gear, latency, theta0_at_src,  wm2_at_src, theta0_at_dst) 
+    a tuplmake_ugn(beta0, gear, latency, theta0_at_src,  wm2_at_src, theta0_at_dst)
 
 Compute the value for the UGN of a particular link, given
 
@@ -146,7 +137,7 @@ end
 
 
 function get_initial_frames_on_link(gear, latency, theta0_at_src,  wm2_at_src)
-    return  floor(gear*theta0_at_src) - floor(gear*(theta0_at_src - latency * wm2_at_src)) 
+    return  floor(gear*theta0_at_src) - floor(gear*(theta0_at_src - latency * wm2_at_src))
 end
 
 function make_frequencies(seed, num_nodes)
@@ -156,7 +147,7 @@ function make_frequencies(seed, num_nodes)
 end
 
 
-    
+
 """
     CalOpts(;)
 
@@ -164,7 +155,7 @@ Return a CalOpts structure. Keyword arguments are:
 
    graph
    latency
-  
+
 """
 function CalOpts(;topology = ("mesh", 3, 2), graph = nothing,
                  kp = 2e-8, ki = 1e-15, tmax = 1e9,
@@ -187,11 +178,11 @@ function CalOpts(;topology = ("mesh", 3, 2), graph = nothing,
     else
         g = Graph(topology; bidirectional)
     end
-    
+
     if isa(latency, Number)
         latency = latency*ones(g.m)
     end
-    
+
     epoch = -10*maximum(latency)
 
     # errors is a function which takes
@@ -234,9 +225,9 @@ function CalOpts(;topology = ("mesh", 3, 2), graph = nothing,
     if isa(beta0, Number)
         beta0 = beta0 * ones(g.m)
     end
-   
-    
-    measurement_offsets = beta0 
+
+
+    measurement_offsets = beta0
 
     if isa(theta0, Number)
         theta0 = theta0*ones(g.n)
@@ -247,7 +238,7 @@ function CalOpts(;topology = ("mesh", 3, 2), graph = nothing,
     end
 
 
-    
+
     function make_link(e)
         return Link(e, g.edges[e].src, g.edges[e].dst,
                     make_ugn(beta0[e], gears[e], latency[e], theta0[g.edges[e].src],
@@ -259,7 +250,7 @@ function CalOpts(;topology = ("mesh", 3, 2), graph = nothing,
     end
 
     links = [make_link(e) for e = 1:g.m]
-    
+
 
     function cnext(i, xi, measurement)
         if length(measurement) == 0
@@ -289,10 +280,10 @@ function CalOpts(;topology = ("mesh", 3, 2), graph = nothing,
     #if isnothing(controller)
     #    controller =  [SimCore.PIController(kp, ki, 0.0, poll_period, base_freq) for i=1:g.n]
     #end
-                
-                
 
-    
+
+
+
     c = CalOpts(g,
                 links,
                 tmax,

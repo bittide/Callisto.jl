@@ -1,21 +1,32 @@
 
-module TestSet
-
+module RunTests
 
 include("testsim.jl")
 using .TestSim
 
-include("testpiecewise.jl")
-using .TestPiecewise
+include("testopts.jl")
+using .TestOpts
 
 using Test
 
-@testset "Callisto tests" begin
-    @test TestSim.main()
-    @test TestPiecewise.main()
+function main()
+    @testset "TestSim" begin
+        @test TestSim.main1()
+        @test TestSim.main2()
+        @test TestSim.main3()
+    end
+    @testset "TestOpts" begin
+        @test TestOpts.main1()
+        @test TestOpts.main2()
+        @test TestOpts.main3()
+    end
 end
-    
+
 
 end
+
+using .RunTests
+RunTests.main()
+
 
 
