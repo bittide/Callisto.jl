@@ -33,10 +33,6 @@ jobs:
         run: |
           mkdir others
 
-      - name: Remove old project.toml
-        run: |
-          /bin/rm Project.toml
-
       - name: Checkout 
         uses: actions/checkout@v4
         with:
