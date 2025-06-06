@@ -33,8 +33,11 @@ jobs:
         with:
           repository: bittide/Piecewise.jl
 
+      - name: Checkout 
+        uses: actions/checkout@v4
+        with:
+          repository: bittide/Topology.jl
 
-        
       - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.version }}
