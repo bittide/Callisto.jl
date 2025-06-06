@@ -3,120 +3,174 @@ module Build
 
 using Pkg
 using Pkg.TOML
-local_packages() = ["bittide/JuliaTools.jl",
-                    "bittide/PlotKitCairo.jl",
-                    "bittide/PlotKitGL.jl",
-                    "bittide/PlotKitAxes.jl",
-                    "bittide/PlotKitDiagrams.jl",
-                    "bittide/PlotKitCharts.jl",
-                    "bittide/PlotKit.jl",
-                    "bittide/PlotKitPresentations.jl",
-                    "bittide/GoogleColors.jl",
-                    "bittide/LogData.jl",
-                    "bittide/Piecewise.jl",
-                    "bittide/CallistoLinear.jl",
-                    "bittide/Topology.jl",
-                    "bittide/StateSystems.jl",
-                    "bittide/BittideTools.jl",
-                    "bittide/Callisto.jl",
-                    "bittide/Callisto2.jl",
-                    "bittide/CallistoVisualization.jl",
-                    "bittide/StandardPlots.jl",
-                    "bittide/ReadElf.jl",
-                    "bittide/RiscVSim.jl",
-                    "bittide/Elara.jl",
-                    ]
 
-is_package_installed(pname) = pname in keys(Pkg.project().dependencies)
-
-function dev_package(package_name::String)
-    if !is_package_installed(package_name)
-        println("Installing: $package_name")
-        Pkg.add(package_name)
-    end
+mutable struct Repo
+    url::String
+    branch::String
 end
 
-function dev_package(dir_name::String)
-    #home = rstrip(ENV["HOME"], ['/', ' '])
-    home = rstrip(pwd(), ['/', ' '])
-    m = match(r"(/)([a-zA-Z0-9]*)(\.jl)", dir_name)
-    if isnothing(m)
-        println("Not installing", dir_name)
-        return
-    end
-    package_name = m[2]
-    #    if !is_package_installed(package_name)
-    println("Installing (dev): $package_name")
-    Pkg.develop(PackageSpec(path = joinpath(home, dir_name)))
-    #end
-end
 
-function git_clone(reponame)
-    cmd = `/usr/bin/git clone https://github.com/$(reponame).git`
+github_repo(reponame, branch) = Repo("https://github.com/$(reponame).git", branch)
+github_repo(reponame) = github_repo(reponame, "main")
+
+
+all_available_local_packages() = [
+    github_repo("bittide/JuliaTools.jl"),
+    github_repo("bittide/PlotKitCairo.jl"),
+    github_repo("bittide/PlotKitGL.jl"),
+    github_repo("bittide/PlotKitAxes.jl", "dev"),
+    github_repo("bittide/PlotKitDiagrams.jl", "dev"),
+    github_repo("bittide/PlotKitCharts.jl", "dev"),
+    github_repo("bittide/PlotKit.jl", "dev"),
+    github_repo("bittide/PlotKitPresentations.jl"),
+    github_repo("bittide/GoogleColors.jl"),
+    github_repo("bittide/LogData.jl"),
+    github_repo("bittide/Piecewise.jl"),
+    github_repo("bittide/CallistoLinear.jl"),
+    github_repo("bittide/Topology.jl"),
+    github_repo("bittide/StateSystems.jl"),
+    github_repo("bittide/BittideTools.jl"),
+    github_repo("bittide/Callisto.jl", "dev"),
+    github_repo("bittide/Callisto2.jl"),
+    github_repo("bittide/CallistoVisualization.jl", "timingplot"),
+    github_repo("bittide/StandardPlots.jl"),
+    github_repo("bittide/ReadElf.jl"),
+    github_repo("bittide/RiscVSim.jl"),
+    github_repo("bittide/Elara.jl"),
+]
+
+
+function git_clone(repo::Repo, dirname = "")
+    git_exe = Sys.which("git")
+    if isnothing(git_exe)
+        error("git command not found in PATH.")
+    end
+    cmd = `$(git_exe) clone -b $(repo.branch) $(repo.url) $(dirname)`
     run(cmd)
 end
 
-function get_repos(dirname)
-    cd(dirname)
-    for package in local_packages()
-        m = match(r"(/)([a-zA-Z0-9]*)(\.jl)", package)
-        if !isnothing(m) && !isdir(m[2] * ".jl")
-            git_clone(package)
-        end
+match_repo_name(s) = match(r"(/)([a-zA-Z0-9_-]+)(\.jl)", s)
+match_repo(r::Repo) = match_repo_name(r.url)
+get_package_name(r::Repo) = extract_package_name_from_path(r.url)
+
+function get_local_directory(r::Repo, repodir)
+    m = match_repo(r)
+    if !isnothing(m)
+        return joinpath(repodir, m[2] * ".jl")
     end
+    return nothing
 end
 
-function mainx()
-    println("current working directory = ", pwd())
-    println("current active project = ", Base.active_project())
-    for a in readdir()
-        println(a)
+"""
+    get_repo(package_repo::Repo, repodir)
+
+Changes the current directory to `dirname` and checks if a directory corresponding
+to the package name derived from `local_package_repo` exists. If the directory
+does not exist, it attempts to clone the repository specified by `local_package_repo`.
+
+"""
+function get_repo(package_repo::Repo, repodir)
+    local_directory = get_local_directory(package_repo, repodir)
+    if !isnothing(local_directory) && !isdir(local_directory)
+        git_clone(package_repo, local_directory)
     end
-    Pkg.Registry.add()
-    mkdir("others")
-    cd("others")
-    git_clone("bittide/JuliaTools")
-    git_clone("bittide/StateSystems")
-    dev_package("others/StateSystems.jl")
-    dev_package("others/StateSystems.jl")
+    return local_directory
 end
 
+
+"""
+    make_package_list(project_toml_file::String) -> Vector{String}
+
+Parses a `Project.toml` file and returns a list of package names
+listed under its `[deps]` section.
+"""
 function make_package_list(project_toml_file)
     parsed_toml = TOML.parsefile(project_toml_file)
-    package_list = keys(parsed_toml["deps"])
-    return collect(package_list)
+    deps = get(parsed_toml, "deps", Dict{String, Any}())
+    return collect(keys(deps))
 end
 
+"""
+    extract_package_name_from_path(package_path)
+
+Extracts the package name from a package path string.
+Assumes the path ends with "/PackageName.jl".
+Returns the "PackageName" or an empty string if the pattern is not matched.
+"""
 function extract_package_name_from_path(package_path)
-    m = match(r"(/)([a-zA-Z0-9]*)(\.jl)", package_path)
+    m = match_repo_name(package_path)
     if isnothing(m)
         return ""
     end
     return m[2]
 end
 
-function install_all_packages(environment_dir, repos_dir, package_list)
-    Pkg.activate(environment_dir)
-    Pkg.instantiate()
-    # The assumption here is that local_packages are in
-    # dependency order, so that we can install them in that order.
-    installed_packages = Dict()
-    for package_repo in local_packages()
-        package_name = extract_package_name_from_path(package_repo)
-        if package_name in package_list
-            package_path = joinpath(repos_dir, package_name * ".jl")
-            dev_package(package_path)
-            installed_packages[package_name] = true
+"""
+    separate_local_and_nonlocal_packages(required_packages)
+
+Given a list of `required_packages` names, this function categorizes them into
+local and non-local packages based on `all_available_local_packages()`.
+
+Returns:
+- A list of repository paths for local packages (e.g., "bittide/PackageName.jl").
+- A list of package names for non-local packages (assumed to be in the general registry).
+
+The returned local package repos are in the same order as they are in
+all_available_local_packages(). The idea is they are ordered by dependency,
+so can be installed in that order.
+"""
+function separate_local_and_nonlocal_packages(required_packages)
+    local_package_repos = []
+    local_package_names = []
+    nonlocal_package_names = []
+
+    for package_repo in all_available_local_packages()
+        package_name = get_package_name(package_repo)
+        if package_name in required_packages
+            push!(local_package_repos, package_repo)
+            push!(local_package_names, package_name)
         end
     end
     # now find remaining packages and they must be
     # in the general registry
-    for package in package_list
-        if !(package in keys(installed_packages))
-            install_package(package)
+    for package in required_packages
+        if !(package in local_package_names)
+            push!(nonlocal_package_names, package)
         end
     end
+    return local_package_repos, nonlocal_package_names
 end
+
+
+
+"""
+    install_local_packages(repos_dir, local_package_repos)
+
+For each package repository in `local_package_repos`:
+1. Clone the repo into `repos_dir`
+2. Adds the package to the current environment in development mode (`Pkg.develop`).
+"""
+function install_local_packages(repos_dir, local_package_repos)
+    for package_repo in local_package_repos
+        package_path = get_repo(package_repo, repos_dir)
+        dev_package(package_path)
+    end
+end
+
+
+
+function install_all_local_packages(repos_dir)
+    local_package_repos = all_available_local_packages()
+    install_local_packages(repos_dir, local_package_repos)
+end
+
+
+function install_nonlocal_packages(nonlocal_packages)
+    for package in nonlocal_packages
+        install_package(package)
+    end
+end
+
 
 function dev_package(package_path)
     try
@@ -134,25 +188,78 @@ function install_package(package_name)
     end
 end
 
-function main_test()
-    home = rstrip(ENV["HOME"], ['/', ' '])
-    repos_dir = joinpath(home, "transfer")
-    package_dir = joinpath(home, "opensource/github/bittide/Callisto.jl")
-    environment_dir = joinpath(home, "transfer/environment")
+function mkpath_if_not_exists(path)
+    if !isdir(path)
+        mkpath(path)
+    end
+end
 
-    get_repos(repos_dir)
-    package_list = make_package_list(joinpath(package_dir, "Project.toml"))
-    install_all_packages(environment_dir, repos_dir, package_list)
+
+"""
+    build_and_test_package(working_dir, package_dir)
+
+Sets up an environment, installs dependencies, and tests a given Julia package.
+
+Example:
+  package_dir = "/home/somewhere/Callisto.jl")
+  working_dir = "/home/emptydir"
+
+The package_dir is not changed, but is used to find the Project.toml
+and install the required dependencies.  Then the package is dev'ed at
+that directory and tested. Dependencies and a Julia environment is stored
+in the working_dir, which should be empty. The working_dir will be created
+if it does not exist.
+
+Steps:
+1. Saves the current active Pkg project.
+2. Creates `environment` and `repos` subdirectories within `working_dir`.
+3. Parses the `Project.toml` of the `package_dir` to get required dependencies.
+4. Separates dependencies into local and non-local.
+5. Activates the new environment in `working_dir/environment`.
+6. Installs local dependencies. Each one is cloned into `working_dir/repos, and installed using Pkg.dev
+7. Installs non-local dependencies using Pkg.add
+8. Installs the main package from `package_dir` in development mode.
+9. Runs `Pkg.test()` for the main package.
+10. Restores the original active Pkg project.
+"""
+function build_and_test_package(working_dir, package_dir)
+    save_project = dirname(Base.active_project())
+
+    environment_dir = joinpath(working_dir, "environment")
+    repos_dir = joinpath(working_dir, "repos")
+    mkpath_if_not_exists(repos_dir)
+
+    required_packages = make_package_list(joinpath(package_dir, "Project.toml"))
+    local_package_repos, nonlocal_package_names = separate_local_and_nonlocal_packages(required_packages)
+
+    Pkg.activate(environment_dir)
+    Pkg.instantiate()
+
+    # You cannot just do install_local_packages(repos_dir, local_package_repos)
+    # because if one of those local packages has another local dependency,
+    # that will not be found
+    install_all_local_packages(repos_dir)
+    install_nonlocal_packages(nonlocal_package_names)
+
+    # now install the main package and test it
     dev_package(package_dir) # this is the main package
     package_name = extract_package_name_from_path(package_dir)
     Pkg.test(package_name)
 
     # revert back to usual dir
-    Pkg.activate(joinpath(home, "opensource/github/bittide/experimental_scripts/src/sandbox/Sandbox"))
+    Pkg.activate(save_project)
+end
+
+function main_test()
+    home = rstrip(ENV["HOME"], ['/', ' '])
+    working_dir = joinpath(home, "transfer")
+    package_dir = joinpath(home, "opensource/github/bittide/PlotKit.jl")
+    build_and_test_package(working_dir, package_dir)
 end
 
 
 end
+
 
 using .Build
 Build.main_test()
