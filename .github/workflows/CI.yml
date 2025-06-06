@@ -47,11 +47,3 @@ jobs:
 
 
 
-
-      # Checkout another repository
-      - name: Checkout another repo
-        uses: actions/checkout@v4
-        with:
-          repository: <owner>/<repo-name>  # Replace with the owner and repository name
-          path: ./another-repo             # Optional: specify a path to clone into (defaults to repo name)
-          token: ${{ secrets.PAT }}      # Optional: Use a Personal Access Token if the repo is private or requires elevated access

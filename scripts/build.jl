@@ -52,8 +52,10 @@ end
 function main()
     println("current working directory = ", pwd())
     println("current active project = ", Base.active_project())
-
-    
+    for a in readdir()
+        println(a)
+    end
+   
 end
 
 
