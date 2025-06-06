@@ -56,6 +56,7 @@ function main()
     for a in readdir()
         println(a)
     end
+    Pkg.Registry.add()
     dev_package("others/StateSystems.jl")
   
 end
