@@ -58,6 +58,9 @@ function main()
         println(a)
     end
     Pkg.Registry.add()
+    #
+    # todo: remove Project.toml before this starts.
+    #
     dev_package("others/StateSystems.jl")
   
 end

@@ -32,7 +32,11 @@ jobs:
       - name: Create directory
         run: |
           mkdir others
-          
+
+      - name: Remove old project.toml
+        run: |
+          /bin/rm Project.toml Manifest.toml
+
       - name: Checkout 
         uses: actions/checkout@v4
         with:
