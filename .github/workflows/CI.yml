@@ -23,6 +23,13 @@ jobs:
         arch:
           - x64
     steps:
+
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: ${{ matrix.version }}
+          arch: ${{ matrix.arch }}
+          localregistry: https://github.com/username/PersonalRegistry.git
+
       - name: Checkout 
         uses: actions/checkout@v4
         with:
@@ -38,11 +45,6 @@ jobs:
         with:
           repository: bittide/Topology.jl
 
-      - uses: julia-actions/setup-julia@v2
-        with:
-          version: ${{ matrix.version }}
-          arch: ${{ matrix.arch }}
-          localregistry: https://github.com/username/PersonalRegistry.git
       - uses: julia-actions/cache@v2
       - uses: ./.github/actions/juliarun
       - uses: julia-actions/julia-buildpkg@v1
