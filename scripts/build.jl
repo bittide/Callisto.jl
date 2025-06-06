@@ -36,8 +36,8 @@ function install_package(package_name::String)
 end
 
 function dev_package(dir_name::String)
-    home = rstrip(ENV["HOME"], ['/', ' '])
-    # get package_name from dir_name
+    #home = rstrip(ENV["HOME"], ['/', ' '])
+    home = rstrip(pwd(), ['/', ' '])
     m = match(r"(/)([a-zA-Z0-9]*)(\.jl)", dir_name)
     if isnothing(m)
         return
@@ -55,6 +55,7 @@ function main()
     for a in readdir()
         println(a)
     end
+    dev_package("others/StateSystems.jl")
   
 end
 

@@ -51,6 +51,12 @@ jobs:
           repository: bittide/Topology.jl
           path: others/Topology.jl
 
+      - name: Checkout 
+        uses: actions/checkout@v4
+        with:
+          repository: bittide/StateSystems.jl
+          path: others/StateSystems.jl
+
       - uses: julia-actions/cache@v2
       - uses: ./.github/actions/juliarun
       - uses: julia-actions/julia-buildpkg@v1
