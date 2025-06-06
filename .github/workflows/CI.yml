@@ -28,24 +28,28 @@ jobs:
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
- 
+
+      - name: Create directory
+        run: |
+          mkdir others
+          
       - name: Checkout 
         uses: actions/checkout@v4
         with:
           repository: bittide/JuliaTools.jl
-          path: JuliaTools.jl
+          path: others/JuliaTools.jl
           
       - name: Checkout 
         uses: actions/checkout@v4
         with:
           repository: bittide/Piecewise.jl
-          path: Piecewise.jl
+          path: others/Piecewise.jl
 
       - name: Checkout 
         uses: actions/checkout@v4
         with:
           repository: bittide/Topology.jl
-          path: Topology.jl
+          path: others/Topology.jl
 
       - uses: julia-actions/cache@v2
       - uses: ./.github/actions/juliarun
