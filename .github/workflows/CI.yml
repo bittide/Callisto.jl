@@ -23,7 +23,18 @@ jobs:
         arch:
           - x64
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout 
+        uses: actions/checkout@v4
+        with:
+          repository: bittide/JuliaTools.jl
+
+      - name: Checkout 
+        uses: actions/checkout@v4
+        with:
+          repository: bittide/Piecewise.jl
+
+
+        
       - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.version }}
@@ -33,3 +44,14 @@ jobs:
       - uses: ./.github/actions/juliarun
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
+
+
+
+
+      # Checkout another repository
+      - name: Checkout another repo
+        uses: actions/checkout@v4
+        with:
+          repository: <owner>/<repo-name>  # Replace with the owner and repository name
+          path: ./another-repo             # Optional: specify a path to clone into (defaults to repo name)
+          token: ${{ secrets.PAT }}      # Optional: Use a Personal Access Token if the repo is private or requires elevated access
