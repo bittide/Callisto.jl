@@ -13,7 +13,6 @@ end
 github_repo(reponame, branch) = Repo("https://github.com/$(reponame).git", branch)
 github_repo(reponame) = github_repo(reponame, "main")
 
-
 all_available_local_packages() = [
     github_repo("bittide/JuliaTools.jl"),
     github_repo("bittide/PlotKitCairo.jl"),
