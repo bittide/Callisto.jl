@@ -224,30 +224,33 @@ Steps:
 """
 function build_and_test_package(working_dir, package_dir)
     save_project = dirname(Base.active_project())
+    try
+        environment_dir = joinpath(working_dir, "environment")
+        repos_dir = joinpath(working_dir, "repos")
+        mkpath_if_not_exists(repos_dir)
 
-    environment_dir = joinpath(working_dir, "environment")
-    repos_dir = joinpath(working_dir, "repos")
-    mkpath_if_not_exists(repos_dir)
+        required_packages = make_package_list(joinpath(package_dir, "Project.toml"))
+        local_package_repos, nonlocal_package_names = separate_local_and_nonlocal_packages(required_packages)
 
-    required_packages = make_package_list(joinpath(package_dir, "Project.toml"))
-    local_package_repos, nonlocal_package_names = separate_local_and_nonlocal_packages(required_packages)
+        Pkg.activate(environment_dir)
+        Pkg.instantiate()
 
-    Pkg.activate(environment_dir)
-    Pkg.instantiate()
+        # You cannot just do install_local_packages(repos_dir, local_package_repos)
+        # because if one of those local packages has another local dependency,
+        # that will not be found
+        install_all_local_packages(repos_dir)
+        install_nonlocal_packages(nonlocal_package_names)
 
-    # You cannot just do install_local_packages(repos_dir, local_package_repos)
-    # because if one of those local packages has another local dependency,
-    # that will not be found
-    install_all_local_packages(repos_dir)
-    install_nonlocal_packages(nonlocal_package_names)
+        # now install the main package and test it
+        dev_package(package_dir) # this is the main package
+        package_name = extract_package_name_from_path(package_dir)
+        Pkg.test(package_name)
 
-    # now install the main package and test it
-    dev_package(package_dir) # this is the main package
-    package_name = extract_package_name_from_path(package_dir)
-    Pkg.test(package_name)
-
-    # revert back to usual dir
-    Pkg.activate(save_project)
+    finally
+        # revert back to usual dir
+        Pkg.activate(save_project)
+    end
+    return
 end
 
 function main_test()
@@ -258,8 +261,17 @@ function main_test()
 end
 
 
+function main()
+    println("current working directory = ", pwd())
+    println("current active project = ", Base.active_project())
+    working_dir = joinpath(pwd(), "working")
+    package_dir = pwd()
+    build_and_test_package(working_dir, package_dir)
+end
+
+
 end
 
 
 using .Build
-Build.main_test()
+Build.main()
