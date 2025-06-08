@@ -13,30 +13,75 @@ end
 github_repo(reponame, branch) = Repo("https://github.com/$(reponame).git", branch)
 github_repo(reponame) = github_repo(reponame, "main")
 
+#
+
+# PUBLIC repos. Callisto or PlotKit have these as dependencies
+    # BittideTools
+    # JuliaTools
+    # LogData
+    # Piecewise
+    # PlotKitAxes
+    # PlotKitCairo
+    # PlotKitCharts
+    # PlotKitDiagrams
+    # StateSystems
+    # Topology
+    # PlotKit
+    # Callisto
+
+# PRIVATE repos
+  # These will be needed for testing because
+  # they are deps of Elara. So either the CI for Elara
+  # uses a token or we make them public.
+    # ReadElf
+    # RiscVSim
+
+  # To be released to users, but private for now:
+  # These have no dependents
+    # Callisto2
+    # CallistoLinear
+    # CallistoVisualization
+    # Elara
+
+  # Internal tools which do not need to be public
+  # These have no dependents
+    # StandardPlots
+    # PlotKitGL
+    # PlotKitPresentations
+    # GoogleColors
+
+# use: PkgDependency.tree("JuliaTools"; reverse = true)
+# to see the dependents.
+
+
+
+
+
 all_available_local_packages() = [
     github_repo("bittide/JuliaTools.jl"),
     github_repo("bittide/PlotKitCairo.jl"),
-    github_repo("bittide/PlotKitGL.jl"),
+#    github_repo("bittide/PlotKitGL.jl"),
     github_repo("bittide/PlotKitAxes.jl", "dev"),
     github_repo("bittide/PlotKitDiagrams.jl", "dev"),
     github_repo("bittide/PlotKitCharts.jl", "dev"),
     github_repo("bittide/PlotKit.jl", "dev"),
-    github_repo("bittide/PlotKitPresentations.jl"),
-    github_repo("bittide/GoogleColors.jl"),
+#    github_repo("bittide/PlotKitPresentations.jl"),
+#    github_repo("bittide/GoogleColors.jl"),
     github_repo("bittide/LogData.jl"),
     github_repo("bittide/Piecewise.jl"),
-    github_repo("bittide/CallistoLinear.jl"),
+#    github_repo("bittide/CallistoLinear.jl"),
     github_repo("bittide/Topology.jl"),
     github_repo("bittide/StateSystems.jl"),
     github_repo("bittide/BittideTools.jl"),
     github_repo("bittide/Callisto.jl", "dev"),
-    github_repo("bittide/Callisto2.jl"),
-    github_repo("bittide/CallistoVisualization.jl", "timingplot"),
-    github_repo("bittide/StandardPlots.jl"),
-    github_repo("bittide/ReadElf.jl"),
-    github_repo("bittide/RiscVSim.jl"),
-    github_repo("bittide/Elara.jl"),
+#    github_repo("bittide/Callisto2.jl"),
+#    github_repo("bittide/CallistoVisualization.jl", "timingplot"),
+#    github_repo("bittide/StandardPlots.jl"),
+#    github_repo("bittide/ReadElf.jl"),
+#    github_repo("bittide/RiscVSim.jl"),
+#    github_repo("bittide/Elara.jl"),
 ]
+
 
 
 function git_clone(repo::Repo, dirname = "")
@@ -273,4 +318,4 @@ end
 
 
 using .Build
-Build.main()
+Build.main_test()
