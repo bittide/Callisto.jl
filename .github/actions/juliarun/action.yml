@@ -12,7 +12,7 @@ inputs:
 runs:
   using: 'composite'
   steps:
-  - run: julia scripts/build.jl
+  - run: julia --color=yes scripts/build.jl
     shell: bash
 
 
