@@ -318,4 +318,4 @@ end
 
 
 using .Build
-Build.main_test()
+Build.main()
