@@ -9,60 +9,10 @@ mutable struct Repo
     branch::String
 end
 
-
 github_repo(reponame, branch) = Repo("https://github.com/$(reponame).git", branch)
 github_repo(reponame) = github_repo(reponame, "main")
-
-
-function git_clone(repo::Repo, dirname = "")
-    git_exe = Sys.which("git")
-    if isnothing(git_exe)
-        error("git command not found in PATH.")
-    end
-    cmd = `$(git_exe) clone -b $(repo.branch) $(repo.url) $(dirname)`
-    run(cmd)
-end
-
 match_repo_name(s) = match(r"(/)([a-zA-Z0-9_-]+)(\.jl)", s)
-match_repo(r::Repo) = match_repo_name(r.url)
 get_package_name(r::Repo) = extract_package_name_from_path(r.url)
-
-function get_local_directory(r::Repo, repodir)
-    m = match_repo(r)
-    if !isnothing(m)
-        return joinpath(repodir, m[2] * ".jl")
-    end
-    return nothing
-end
-
-"""
-    get_repo(package_repo::Repo, repodir)
-
-Changes the current directory to `dirname` and checks if a directory corresponding
-to the package name derived from `local_package_repo` exists. If the directory
-does not exist, it attempts to clone the repository specified by `local_package_repo`.
-
-"""
-function get_repo(package_repo::Repo, repodir)
-    local_directory = get_local_directory(package_repo, repodir)
-    if !isnothing(local_directory) && !isdir(local_directory)
-        git_clone(package_repo, local_directory)
-    end
-    return local_directory
-end
-
-
-"""
-    make_package_list(project_toml_file::String) -> Vector{String}
-
-Parses a `Project.toml` file and returns a list of package names
-listed under its `[deps]` section.
-"""
-function get_deps_from_toml(project_toml_file)
-    parsed_toml = TOML.parsefile(project_toml_file)
-    deps = get(parsed_toml, "deps", Dict{String, Any}())
-    return collect(keys(deps))
-end
 
 """
     extract_package_name_from_path(package_path)
@@ -79,22 +29,26 @@ function extract_package_name_from_path(package_path)
     return m[2]
 end
 
-"""
-    install_local_packages(repos_dir, local_package_repos)
 
-For each package repository in `local_package_repos`:
-1. Clone the repo into `repos_dir`
-2. Adds the package to the current environment in development mode (`Pkg.develop`).
 """
-function install_local_packages(repos_dir, local_package_repos)
-    for package_repo in local_package_repos
-        package_path = get_repo(package_repo, repos_dir)
-        dev_package(package_path)
-    end
+    make_package_list(project_toml_file::String) -> Vector{String}
+
+Parses a `Project.toml` file and returns a list of package names
+listed under its `[deps]` section.
+"""
+function get_deps_from_toml(project_toml_file)
+    parsed_toml = TOML.parsefile(project_toml_file)
+    deps = get(parsed_toml, "deps", Dict{String, Any}())
+    return collect(keys(deps))
 end
 
 
-
+#
+# Pkg.add will clone the repo, using the correct branch
+# to somewhere in ~/.julia/packages, and then add the package
+# to the active environment
+#
+add_package(r::Repo) = Pkg.add(PackageSpec(url = r.url, rev = r.branch))
 dev_package(package_path) = Pkg.develop(PackageSpec(path = package_path))
 
 """
@@ -141,8 +95,10 @@ function build_and_test_package(working_dir, package_dir, local_package_repos)
 
         # You cannot just look at Project.toml to find the local
         # dependencies, because if one of those local packages has another local dependency,
-        # that will not be found
-        install_local_packages(repos_dir, local_package_repos)
+        # that will not be found.
+        for r in local_package_repos
+            add_package(r)
+        end
         Pkg.add(nonlocal_package_names)
 
         # now install the main package and test it
