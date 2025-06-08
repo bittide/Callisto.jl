@@ -10,11 +10,6 @@ function deps_for_callisto()
     b(x) = github_repo("bittide/$(x).jl")
     local_package_repos = [
         b("JuliaTools"),
-        b("PlotKitCairo"),
-        b("PlotKitAxes", "dev"),
-        b("PlotKitDiagrams", "dev"),
-        b("PlotKitCharts", "dev"),
-        b("PlotKit", "dev"),
         b("LogData"),
         b("Piecewise"),
         b("Topology"),
