@@ -9,8 +9,8 @@ struct Checker end
 
 sim_is_done(stopper::Nothing, errors, i, p, c, s) = false
 
-import ..Opts: CalOpts
-import ..SimCore: SimCore, errorat, initial_error, local_to_realtime
+import ..Opts: CalOpts, make_ugn, C1Opts
+import ..SimCore: SimCore, Link, errorat, initial_error, local_to_realtime, Model
 import LogData: Log, log, start_new_record
 import Piecewise: PiecewiseLinear, evaluate_with_guess, extend_absx_dy, extend_dx_dy,
     invert, invert_with_guess
@@ -53,14 +53,14 @@ end
     return ugn + floor(gear*phase1) - floor(gear*theta_at_iom)
 end
 
-@inline function get_measurement(b::Nothing, link, physical_time_at_iom, theta, theta_at_iom, guess1)
+@inline function get_measurement(link, physical_time_at_iom, theta, theta_at_iom, guess1)
     #return (betax(link, physical_time_at_iom, theta, theta_at_iom, guess1) - link.offset)/link.gear
     return betax(link, physical_time_at_iom, theta, theta_at_iom, guess1)
 end
 ##############################################################################
 
 # measurement
-function Gx(i, theta, s, theta0, p, links, incoming, d, beta_maker, slog, measurement, guess1, guess2)
+function Gx(i, theta, s, theta0, p, links, incoming, d, slog, measurement, guess1, guess2)
     #
     # This means in particular that sampling always starts
     # off roughly in phase across all nodes. Perhaps we should have
@@ -84,7 +84,7 @@ function Gx(i, theta, s, theta0, p, links, incoming, d, beta_maker, slog, measur
     occ = measurement.occupancies
     for (j,e) in enumerate(incoming[i])
         link = links[e]
-        mm = get_measurement(beta_maker, link, physical_time_at_iom, theta, theta_at_iom, guess1)
+        mm = get_measurement(link, physical_time_at_iom, theta, theta_at_iom, guess1)
         occ[j] = mm # (mm - link.offset)/link.gear
         log_occupancy(slog, e, physical_time_at_iom, mm)
     end
@@ -154,8 +154,8 @@ end
 
 function callisto(slog, tmax, epoch, num_nodes, links, incoming, p, d, errors,
                   theta0, freq_m2, freq_m1, wmin,
-                  special, stopper, maxindegree,
-                  controller, checker, beta_maker)
+                  stopper,
+                  controller, checker)
 
     check(d, p, initial_error.(errors), num_nodes, tmax)
     measurement = [Measurement(zeros(length(incoming[i]))) for i = 1:num_nodes]
@@ -169,7 +169,7 @@ function callisto(slog, tmax, epoch, num_nodes, links, incoming, p, d, errors,
         s, i  = find_soonest_node(theta, num_nodes)
 
         Gx(i, theta, s, theta0, p,
-           links, incoming, d, beta_maker,
+           links, incoming, d,
            slog, measurement[i],
            guess1, guess2)
         #
@@ -191,37 +191,107 @@ function callisto(slog, tmax, epoch, num_nodes, links, incoming, p, d, errors,
     return slog, theta
 end
 
+function runcallisto(model::Model)
+    return callisto(model.slog, model.tmax, model.epoch, model.num_nodes,
+        model.links, model.incoming, model.p, model.d, model.errors,
+        model.theta0, model.wm2, model.wm1, model.wmin,
+        model.stopper,
+        model.controller, model.checker)
+end
 
-
-function callisto(c)
-    print("Running callisto: ")
+function make_model(c)
     n = c.graph.n
     m = c.graph.m
-
+    if isnothing(c.v)
+        v = C1Opts()
+    else
+        c = c.v
+    end
     if c.enable_logging
         # todo add recommended log length
         slog = log_init(m)
     else
         slog = nothing
     end
-
-    if c.safe
+    if c.check_freq_is_positive
         checker = Checker()
     else
         checker = nothing
     end
+    errors = c.errors
+    if c.errors == :random
+        seed = 1
+        errors = make_frequencies(seed, n)
+    end
+    controller = [default_controller(i, c) for i=1:n]
+    latencies = [ati(c.latency, e) for e = 1:m]
+    epoch = -10*maximum(latencies)
+    incoming = c.graph.incoming_edges
 
-    maxindegree = maximum([length(c.graph.incoming_edges[i]) for i = 1:n])
+    wm2 = [initial_error(errors[i]) for i=1:n]
+    wm1 = [initial_error(errors[i]) for i=1:n]
+    wmin = 0.99 * c.base_freq
 
-    if isnothing(c.controller)
-        c.controller = [make_controller(i, c) for i=1:n]
+    if v.beta0 == :offset
+        beta0 = c.offset
+    else
+        beta0 = v.beta0
     end
 
+
+
+    theta0 = [ati(c.theta0, i) for i = 1:n]
+    gears = [ati(v.gears, e) for e=1:m]
+    beta0 = [ati(beta0, e) for e=1:m]
+    offset = [ati(c.offset, e) for e=1:m]
+
+    ugn(e) = make_ugn(beta0[e],
+        gears[e],
+        latencies[e],
+        theta0[c.graph.edges[e].src],
+        wm2[c.graph.edges[e].src],
+        theta0[c.graph.edges[e].dst])
+
+    function make_link(e)
+        return Link(e,
+            c.graph.edges[e].src,
+            c.graph.edges[e].dst,
+            ugn(e),
+            latencies[e],
+            gears[e],
+            beta0[e],
+            offset[e])
+    end
+
+    links = [make_link(e) for e = 1:m]
+
+    model = Model(;
+        slog,
+        tmax = c.tmax,
+        epoch,
+        num_nodes = n,
+        links, incoming,
+        p = c.poll_period,
+        d = v.control_delay,
+        errors,
+        theta0 = theta0,
+        wm2 ,
+        wm1,
+        wmin,
+        stopper = c.stopper,
+        controller,
+        checker)
+    return model
+end
+
+
+function callisto(c)
+    print("Running callisto: ")
+
+    model = make_model(c)
+
     # callisto cares about only the incoming edges to each node
-    @time simlog, theta = callisto(slog, c.tmax, c.epoch, c.graph.n,
-        c.links, c.graph.incoming_edges, c.poll_period, c.control_delay,
-        c.errors, c.theta0, c.wm2, c.wm1, c.wmin, c.special, c.stopper,
-        maxindegree, c.controller, checker, c.beta_maker)
+    @time simlog, theta = runcallisto(model)
 
     return (simlog = simlog, theta = theta,)
 end

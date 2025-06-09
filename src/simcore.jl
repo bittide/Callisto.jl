@@ -68,6 +68,43 @@ struct PwlError <: Error
 end
 
 
+# constants
+Base.@kwdef mutable struct Model
+    slog
+    tmax
+    epoch
+    num_nodes
+    links
+    incoming
+    p
+    d
+    errors
+    theta0
+    wm2
+    wm1
+    wmin
+    stopper
+    controller
+    checker
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 initial_error(e::Error) = e(0)
 initial_error(e::Number) = e
 initial_error(e::Vector{T}) where {T <: Error} = e(0)

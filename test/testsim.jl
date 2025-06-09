@@ -4,6 +4,7 @@ using Piecewise
 using Topology
 using Callisto.Sim
 using Callisto.SimCore
+using BittideTools
 
 function offsetnormsquared(p::Piecewise.PiecewiseLinear, offset)
     s = 0.0
@@ -50,18 +51,15 @@ function testcallisto(tmax,
     control_delay = 1000
     slog = nothing
     checker = nothing
-    special = nothing
     stopper = nothing
-    maxindegree = maximum([length(graph.incoming_edges[i]) for i = 1:n])
     local_offset(i) = inport_indexed_from_edge_indexed(graph, offset, i)
-    controller = [ Sim.make_controller(i, graph, kp, ki, poll_period, base_freq,
+    controller = [ default_controller(i, graph, kp, ki, poll_period, base_freq,
         local_offset(i)) for i=1:graph.n]
-    beta_maker = nothing
 
     simlog, theta = callisto(slog, tmax, epoch, graph.n,
         links, graph.incoming_edges, poll_period, control_delay,
-        errors, theta0, wm2, wm1, wmin, special, stopper,
-        maxindegree, controller, checker, beta_maker)
+        errors, theta0, wm2, wm1, wmin, stopper,
+        controller, checker)
 
     return theta
 end

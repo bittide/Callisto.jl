@@ -1,7 +1,7 @@
 
 module Opts
 
-export CalOpts
+export C1Opts
 
 import ..SimCore: Error, Link,  SimCore, initial_error
 import Topology: Graph
@@ -147,6 +147,11 @@ function make_frequencies(seed, num_nodes)
 end
 
 
+Base.@kwdef mutable struct C1Opts
+    gears = 1
+    beta0 = :offset
+    control_delay = 1000
+end
 
 """
     CalOpts(;)
