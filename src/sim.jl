@@ -1,21 +1,13 @@
 
 module Sim
 
-export callisto, OutputSystem, make_model
+export callisto, make_model
 
-
-struct Checker end
-
-
-sim_is_done(stopper::Nothing, errors, i, p, c, s) = false
-
-import ..Opts: CalOpts, make_ugn, C1Opts
-import ..SimCore: SimCore, Link, errorat, initial_error, local_to_realtime, Model
+import ..SimCore: SimCore, Link, Model, C1Opts
 import LogData: Log, log, start_new_record
-import Piecewise: PiecewiseLinear, evaluate_with_guess, extend_absx_dy, extend_dx_dy,
-    invert, invert_with_guess
-import StateSystems: StateSystems, PIStateSystem, StateSystem, compose, next
-import Topology: Topology, inport_indexed_from_edge_indexed
+import Piecewise: PiecewiseLinear, evaluate_with_guess, extend_dx_dy, invert, invert_with_guess
+import StateSystems: next
+import Topology: inport_indexed_from_edge_indexed
 
 using BittideTools
 using JuliaTools
@@ -34,16 +26,7 @@ end
 @inline log_occupancy(slog::Nothing, eid, t, mocc) = return
 
 
-##############################################################################
 
-@inline check_freq_is_positive(ch::Nothing, c, errors, i, s) = return
-
-function check_freq_is_positive(ch::Checker, c, errors, i, s)
-    if c + errorat(errors[i], s) <= 0
-        println("Frequency at node $i has become negative: omega = ", c + errors[i](s))
-        println("time s = ", s)
-    end
-end
 ##############################################################################
 
 @inline get_phase(theta::PiecewiseLinear, t::Float64, guess::Int) = evaluate_with_guess(theta, t, guess::Int)
@@ -54,7 +37,6 @@ end
 end
 
 @inline function get_measurement(link, physical_time_at_iom, theta, theta_at_iom, guess1)
-    #return (betax(link, physical_time_at_iom, theta, theta_at_iom, guess1) - link.offset)/link.gear
     return betax(link, physical_time_at_iom, theta, theta_at_iom, guess1)
 end
 ##############################################################################
@@ -92,12 +74,6 @@ function Gx(i, theta, s, theta0, p, links, incoming, d, slog, measurement, guess
     measurement.physical_time_at_iom = physical_time_at_iom
 end
 
-function sum_or_missing(x)
-    if length(x) == 0
-        return -100
-    end
-    return sum(x)
-end
 
 function initial_statex(i, epoch, freq_m2, freq_m1, theta0, d, slog)
     sample_times = Float64[epoch,                             0,                 d/freq_m1]
@@ -120,7 +96,7 @@ function check(d, p, w, n, tmax)
 end
 
 function make_guesses(errors, num_nodes, links, d)
-    wavg = sum(SimCore.initial_error.(errors)) / num_nodes
+    wavg = sum(initial_error.(errors)) / num_nodes
     latency_min = minimum([l.latency for l in links])
     # The two values guess1 and guess2 are approximately how many ticks ago
     # we need to evaluate theta in order to compute buffer occupancy.
@@ -197,6 +173,10 @@ function runcallisto(model::Model)
         model.wm1, model.wmin, model.stopper, model.controller, model.checker)
 end
 
+function mkugn(beta0, gear, latency, theta0_at_src,  wm2_at_src, theta0_at_dst)
+    return beta0 - floor(gear*(theta0_at_src - latency * wm2_at_src)) + floor(gear*theta0_at_dst)
+end
+
 function make_model(c)
     n = c.graph.n
     m = c.graph.m
@@ -240,14 +220,14 @@ function make_model(c)
         beta0 = v.beta0
     end
 
-
-
     theta0 = [ati(c.theta0, i) for i = 1:n]
     gears = [ati(v.gears, e) for e=1:m]
     beta0 = [ati(beta0, e) for e=1:m]
     offset = [ati(c.offset, e) for e=1:m]
 
-    ugn(e) = make_ugn(beta0[e],
+
+
+    ugn(e) = mkugn(beta0[e],
         gears[e],
         latencies[e],
         theta0[c.graph.edges[e].src],

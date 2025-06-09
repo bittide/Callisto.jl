@@ -4,9 +4,6 @@ module Callisto
 include("simcore.jl")
 using .SimCore
 
-# depends on SimCore and Topology 
-include("opts.jl")
-using .Opts
 
 # depends on SimCore, LogData, and Piecewise
 include("sim.jl")
@@ -28,7 +25,6 @@ function reexport(m)
 end
 
 reexport(SimCore)
-reexport(Opts)
 reexport(Sim)
 reexport(Post)
 reexport(FastPostProc)
