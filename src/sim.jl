@@ -1,7 +1,7 @@
 
 module Sim
 
-export callisto, OutputSystem
+export callisto, OutputSystem, make_model
 
 
 struct Checker end
@@ -192,11 +192,9 @@ function callisto(slog, tmax, epoch, num_nodes, links, incoming, p, d, errors,
 end
 
 function runcallisto(model::Model)
-    return callisto(model.slog, model.tmax, model.epoch, model.num_nodes,
-        model.links, model.incoming, model.p, model.d, model.errors,
-        model.theta0, model.wm2, model.wm1, model.wmin,
-        model.stopper,
-        model.controller, model.checker)
+    return callisto(model.slog, model.tmax, model.epoch, model.num_nodes, model.links,
+        model.incoming, model.p, model.d, model.errors, model.theta0, model.wm2,
+        model.wm1, model.wmin, model.stopper, model.controller, model.checker)
 end
 
 function make_model(c)
@@ -223,7 +221,11 @@ function make_model(c)
         seed = 1
         errors = make_frequencies(seed, n)
     end
-    controller = [default_controller(i, c) for i=1:n]
+    if c.controller == :pi
+        controller = [default_controller(i, c) for i=1:n]
+    else
+        controller = c.controller
+    end
     latencies = [ati(c.latency, e) for e = 1:m]
     epoch = -10*maximum(latencies)
     incoming = c.graph.incoming_edges
