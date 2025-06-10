@@ -173,9 +173,7 @@ function runcallisto(model::Model)
         model.wm1, model.wmin, model.stopper, model.controller, model.checker)
 end
 
-function mkugn(beta0, gear, latency, theta0_at_src,  wm2_at_src, theta0_at_dst)
-    return beta0 - floor(gear*(theta0_at_src - latency * wm2_at_src)) + floor(gear*theta0_at_dst)
-end
+
 
 function make_model(c)
     n = c.graph.n
@@ -221,27 +219,11 @@ function make_model(c)
     beta0 = [ati(beta0, e) for e=1:m]
     offset = [ati(c.offset, e) for e=1:m]
 
+    ugn = get_constant_ugn(c, beta0, errors; gears)
 
 
-    ugn(e) = mkugn(beta0[e],
-        gears[e],
-        latencies[e],
-        theta0[c.graph.edges[e].src],
-        wm2[c.graph.edges[e].src],
-        theta0[c.graph.edges[e].dst])
-
-    function make_link(e)
-        return Link(e,
-            c.graph.edges[e].src,
-            c.graph.edges[e].dst,
-            ugn(e),
-            latencies[e],
-            gears[e],
-            beta0[e],
-            offset[e])
-    end
-
-    links = [make_link(e) for e = 1:m]
+    links = [Link(e, c.graph.edges[e].src, c.graph.edges[e].dst,
+                 ugn[e], latencies[e], gears[e], beta0[e], offset[e]) for e in 1:m]
 
     model = Model(;
         slog,
