@@ -183,7 +183,7 @@ function make_model(c)
     if isnothing(c.v)
         v = C1Opts()
     else
-        c = c.v
+        v = c.v
     end
     if c.enable_logging
         # todo add recommended log length
@@ -196,11 +196,7 @@ function make_model(c)
     else
         checker = nothing
     end
-    errors = c.errors
-    if c.errors == :random
-        seed = 1
-        errors = make_frequencies(seed, n)
-    end
+    errors = get_frequencies(c)
     if c.controller == :pi
         controller = [default_controller(i, c) for i=1:n]
     else
@@ -212,7 +208,7 @@ function make_model(c)
 
     wm2 = [initial_error(errors[i]) for i=1:n]
     wm1 = [initial_error(errors[i]) for i=1:n]
-    wmin = 0.99 * c.base_freq
+    wmin = 0.9 * c.base_freq
 
     if v.beta0 == :offset
         beta0 = c.offset

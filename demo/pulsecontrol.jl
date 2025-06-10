@@ -14,7 +14,7 @@ function setup()
     typical_freq = 0.2 # GHz
     max_ppm = 100
     freqs = typical_freq * (1 .+  rand(-max_ppm:max_ppm, num_nodes) /  1e6)
-    errors =  [Error(a) for a in freqs]
+    errors =  freqs
 
     return getopts(; topology = ["triangle"],
                    latency = 200,

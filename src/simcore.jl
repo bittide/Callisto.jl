@@ -14,7 +14,7 @@
 
 module SimCore
 
-export Link
+export Link, C1Opts
 
 mutable struct Link
     id::Int64

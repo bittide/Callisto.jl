@@ -5,6 +5,7 @@ module Post
 export focused_callisto_info
 
 import Piecewise: after, before, delay
+import ..Sim: make_model
 
 ##############################################################################
 # For those who want all the details, use this
@@ -22,7 +23,8 @@ end
 
 # things that take a long time we only apply to a time range
 function get_occ(c, theta, tmin, tmax)
-    occ = [beta_piecewise(c, link, theta, tmin, tmax) for link in c.links]
+    model = make_model(c)
+    occ = [beta_piecewise(c, link, theta, tmin, tmax) for link in model.links]
     return occ
 end
 
