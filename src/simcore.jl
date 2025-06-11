@@ -64,6 +64,7 @@ end
 Base.@kwdef mutable struct ComputedParams
     output_systems
     offset
+    local_offsets
 end
 
 
@@ -163,7 +164,10 @@ function compute_parameters(c::Cal1Opts)
     # and to make the ugns
     if c.offset == :beta0
         offset = c.beta0
+    else
+        offset = c.offset
     end
+
     beta0 = c.beta0
 
     theta0 = [ati(c.theta0, i) for i = 1:n]
@@ -183,7 +187,9 @@ function compute_parameters(c::Cal1Opts)
         checker = nothing
     end
 
-    output_systems = [make_output_system(i, offset, c.graph) for i=1:n]
+    local_offsets = [inport_indexed_from_edge_indexed(c.graph, offset, i) for i=1:n]
+
+    output_systems = [OutputSystem(local_offsets[i]) for i=1:n]
 
     if c.controller == :pi
         controller = [composed_controller(i, c.graph, c.kp,
@@ -221,7 +227,7 @@ function compute_parameters(c::Cal1Opts)
         stopper = c.stopper,
         controller,
         checker)
-    c.computed = ComputedParams(output_systems, offset)
+    c.computed = ComputedParams(output_systems, offset, local_offsets)
 end
 
 
