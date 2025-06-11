@@ -1,10 +1,8 @@
 
 module Sim
 
-export callisto, compute_parameters, CalOpts
-
-import ..SimCore: SimCore, Link, Model, Cal1Opts
-import LogData: Log, log, start_new_record
+export callisto
+import ..SimCore: SimCore, Link, Model, Cal1Opts, compute_parameters, log_occupancy
 import Piecewise: PiecewiseLinear, evaluate_with_guess, extend_dx_dy, invert, invert_with_guess
 import StateSystems: next
 import Topology: inport_indexed_from_edge_indexed
@@ -15,16 +13,6 @@ using Random
 
 
 ##############################################################################
-
-const log_fields = (; tk=1, mocc=2)
-log_init(m) =  [Log(log_fields) for i=1:m]
-@inline function log_occupancy(slog::Vector{Log}, eid, t, mocc)
-    log(slog[eid], log_fields.tk, t)
-    log(slog[eid], log_fields.mocc, mocc)
-    start_new_record(slog[eid])
-end
-
-@inline log_occupancy(slog::Nothing, eid, t, mocc) = return
 
 
 
@@ -161,7 +149,9 @@ function callisto(slog, tmax, epoch, num_nodes, links, incoming, p, d, errors,
         # This is the physical time between the current control action
         # and the next one.
         ds = local_to_realtime(errors[i], p, c, s, wmin)
-        check_freq_is_positive(checker, c, errors, i, s)
+        if !check_freq_is_positive(checker, c, errors, i, s)
+            break
+        end
         extend_dx_dy(theta[i], ds, p)
         done = sim_is_done(stopper, errors, i, p, c, s)
     end
@@ -175,88 +165,6 @@ function runcallisto(model::Model)
 end
 
 
-function make_ugn(beta0, gear, latency, theta0_at_src,  wm2_at_src, theta0_at_dst)
-    return beta0 - floor(gear*(theta0_at_src - latency * wm2_at_src)) + floor(gear*theta0_at_dst)
-end
-
-
-
-function make_frequencies(seed, num_nodes)
-     rng = Random.Xoshiro(seed)
-     f = 1 .+  rand(rng, 1:10^5, num_nodes) *  1e-9
-     return f
-end
-
-
-function compute_parameters(c::Cal1Opts)
-    n = c.graph.n
-    m = c.graph.m
-    if c.errors == :random
-        errors = make_frequencies(1, c.graph.n)
-    else
-        errors = c.errors
-    end
-    latency = [ati(c.latency, e) for e = 1:m]
-
-    # beta0 is used to provide the measurement offsets
-    # and to make the ugns
-    if c.beta0 == :offset
-        beta0 = c.offset
-    else
-        beta0 = c.beta0
-    end
-    theta0 = [ati(c.theta0, i) for i = 1:n]
-    gears = [ati(c.gears, e) for e=1:m]
-    beta0 = [ati(beta0, e) for e=1:m]
-    offset = [ati(c.offset, e) for e=1:m]
-
-    if c.enable_logging
-        # todo add recommended log length
-        slog = log_init(m)
-    else
-        slog = nothing
-    end
-    if c.check_freq_is_positive
-        checker = Checker()
-    else
-        checker = nothing
-    end
-
-    if c.controller == :pi
-        controller = [default_controller(i, c) for i=1:n]
-    else
-        controller = c.controller
-    end
-    epoch = -10*maximum(latency)
-    incoming = c.graph.incoming_edges
-
-    wm2 = [initial_error(errors[i]) for i=1:n]
-    wm1 = [initial_error(errors[i]) for i=1:n]
-    wmin = 0.9 * c.base_freq
-
-    ugn =  [make_ugn(beta0[e], gears[e], latency[e], theta0[c.graph.edges[e].src],
-                        wm2[c.graph.edges[e].src], theta0[c.graph.edges[e].dst]) for e=1:m]
-
-    links = [Link(e, c.graph.edges[e].src, c.graph.edges[e].dst,
-                 ugn[e], latency[e], gears[e], beta0[e], offset[e]) for e in 1:m]
-
-    c.model = Model(;
-        slog,
-        tmax = c.tmax,
-        epoch,
-        num_nodes = n,
-        links, incoming,
-        p = c.poll_period,
-        d = c.control_delay,
-        errors,
-        theta0,
-        wm2,
-        wm1,
-        wmin,
-        stopper = c.stopper,
-        controller,
-        checker)
-end
 
 
 function callisto(c)

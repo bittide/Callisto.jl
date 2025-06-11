@@ -16,7 +16,20 @@ module SimCore
 
 using Topology
 using JuliaTools
-export Link, CalOpts, Cal1Opts
+using BittideTools
+import LogData: Log, log, start_new_record
+
+export Link, CalOpts, Cal1Opts, compute_parameters
+
+const log_fields = (; tk=1, mocc=2)
+log_init(m) =  [Log(log_fields) for i=1:m]
+@inline function log_occupancy(slog::Vector{Log}, eid, t, mocc)
+    log(slog[eid], log_fields.tk, t)
+    log(slog[eid], log_fields.mocc, mocc)
+    start_new_record(slog[eid])
+end
+@inline log_occupancy(slog::Nothing, eid, t, mocc) = return
+
 
 mutable struct Link
     id::Int64
@@ -46,6 +59,11 @@ Base.@kwdef mutable struct Model
     stopper
     controller
     checker
+end
+
+Base.@kwdef mutable struct ComputedParams
+    output_systems
+    offset
 end
 
 
@@ -79,7 +97,7 @@ Holds configuration options for a Callisto simulation.
 Base.@kwdef mutable struct Cal1Opts
     graph = Topology.Graph(["triangle"]; bidirectional = true)
     latency = 5000
-    offset = 50
+    offset = :beta0
     tmax = 1e9
     kp = 2e-8
     ki = 1e-15
@@ -92,10 +110,11 @@ Base.@kwdef mutable struct Cal1Opts
     enable_logging = true
     controller = :pi
     # options below only used for callisto 1
-    beta0 = :offset
+    beta0 = 50
     gears = 1
     control_delay = 1000
     model = nothing
+    computed = nothing
 end
 
 # CalOpts should be such that at any time before running callisto,
@@ -104,13 +123,107 @@ end
 # we do not instantiate the errors with a random vector of length
 # n, since if subsequently the graph is changed then the struct
 # would become inconsistent.
+#
+# Another viewpoint. Some parameters are set by the user
+# and some are set by the simulator.
+# No parameters should be set by both
+#
+#
+# Also, dependencies of Callisto, like BittideTools, cannot access
+# Cal1Opts.
+#
+
+
 
 function CalOpts(; topology = nothing, kw...)
     c = Cal1Opts(; allowed_kws(Cal1Opts, kw)...)
     if !isnothing(topology)
-        c.graph = Topology.Graph(topology)
+        c.graph = Topology.Graph(topology; bidirectional = true)
     end
+    compute_parameters(c)
     return c
 end
+
+
+function make_ugn(beta0, gear, latency, theta0_at_src,  wm2_at_src, theta0_at_dst)
+    return beta0 - floor(gear*(theta0_at_src - latency * wm2_at_src)) + floor(gear*theta0_at_dst)
+end
+
+function compute_parameters(c::Cal1Opts)
+    n = c.graph.n
+    m = c.graph.m
+    if c.errors == :random
+        errors = make_frequencies(1, c.graph.n)
+    else
+        errors = c.errors
+    end
+    latency = [ati(c.latency, e) for e = 1:m]
+
+    # beta0 is used to provide the measurement offsets
+    # and to make the ugns
+    if c.offset == :beta0
+        offset = c.beta0
+    end
+    beta0 = c.beta0
+
+    theta0 = [ati(c.theta0, i) for i = 1:n]
+    gears = [ati(c.gears, e) for e=1:m]
+    beta0 = [ati(beta0, e) for e=1:m]
+    offset = [ati(offset, e) for e=1:m]
+
+    if c.enable_logging
+        # todo add recommended log length
+        slog = log_init(m)
+    else
+        slog = nothing
+    end
+    if c.check_freq_is_positive
+        checker = Checker()
+    else
+        checker = nothing
+    end
+
+    output_systems = [make_output_system(i, offset, c.graph) for i=1:n]
+
+    if c.controller == :pi
+        controller = [composed_controller(i, c.graph, c.kp,
+            c.ki, c.poll_period, c.base_freq, output_systems[i]) for i=1:n]
+    else
+        controller = c.controller
+    end
+    epoch = -10*maximum(latency)
+    incoming = c.graph.incoming_edges
+
+    wm2 = [initial_error(errors[i]) for i=1:n]
+    wm1 = [initial_error(errors[i]) for i=1:n]
+    wmin = 0.9 * c.base_freq
+
+    ugn =  [make_ugn(beta0[e], gears[e], latency[e], theta0[c.graph.edges[e].src],
+                        wm2[c.graph.edges[e].src], theta0[c.graph.edges[e].dst]) for e=1:m]
+
+    links = [Link(e, c.graph.edges[e].src, c.graph.edges[e].dst,
+                 ugn[e], latency[e], gears[e], beta0[e], offset[e]) for e in 1:m]
+
+
+    c.model = Model(;
+        slog,
+        tmax = c.tmax,
+        epoch,
+        num_nodes = n,
+        links, incoming,
+        p = c.poll_period,
+        d = c.control_delay,
+        errors,
+        theta0,
+        wm2,
+        wm1,
+        wmin,
+        stopper = c.stopper,
+        controller,
+        checker)
+    c.computed = ComputedParams(output_systems, offset)
+end
+
+
 
 end
