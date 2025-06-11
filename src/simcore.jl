@@ -14,7 +14,9 @@
 
 module SimCore
 
-export Link, C1Opts
+using Topology
+using JuliaTools
+export Link, CalOpts, Cal1Opts
 
 mutable struct Link
     id::Int64
@@ -46,12 +48,69 @@ Base.@kwdef mutable struct Model
     checker
 end
 
-Base.@kwdef mutable struct C1Opts
-    gears = 1
+
+"""
+    CalOpts structure
+Holds configuration options for a Callisto simulation.
+
+# Fields
+- `graph`:                      The network topology. Defaults to a 3-node bidirectional triangle.
+- `latency`:                    Link latencies. Can be a scalar (applied to all links) or a vector. Defaults to 20.
+- `offset`:                     Initial buffer offsets/target occupancies. Can be a scalar or a vector. Defaults to 200.
+- `tmax`:                       Maximum simulation time. Defaults to 1.5e5.
+- `kp`:                         Proportional gain for the PI controller. Defaults to 8e-6.
+- `ki`:                         Integral gain for the PI controller. Defaults to 0.0.
+- `poll_period`:                Time between controller updates for each node. Defaults to 2000.
+- `theta0`:                     Initial phase for each node. Can be a scalar or a vector. Defaults to 0.0.
+- `errors`:                     Clock frequency errors for each node.
+                                Can be `:random` (generates random errors), a vector of numerical error values,
+                                or a vector of `SimCore.Error` objects. Defaults to `:random`.
+- `base_freq`:                  Base frequency used by the controller for scaling the integral term. Defaults to 1.0.
+- `stopper`:                    A custom stopping condition for the simulation. Defaults to `nothing` (no custom stopper).
+- `check_freq_is_positive`:     If `true`, checks if node frequencies become negative during simulation. Defaults to `true`.
+- `enable_logging`:             If `true`, enables logging of simulation data (e.g., buffer occupancies). Defaults to `true`.
+- `controller`:                 Specifies the controller type for each node.
+                                Can be `:pi` (default PI controller) or a vector of
+                                custom controller objects. Defaults to `:pi`.
+- `v`:                          Options specific to Callisto1 or Callisto2 features (e.g., link up/down behavior, prefill).
+
+
+"""
+Base.@kwdef mutable struct Cal1Opts
+    graph = Topology.Graph(["triangle"]; bidirectional = true)
+    latency = 5000
+    offset = 50
+    tmax = 1e9
+    kp = 2e-8
+    ki = 1e-15
+    poll_period = 100000
+    theta0 = 0.1
+    errors = :random
+    base_freq = 1.0
+    stopper = nothing
+    check_freq_is_positive = true
+    enable_logging = true
+    controller = :pi
+    # options below only used for callisto 1
     beta0 = :offset
+    gears = 1
     control_delay = 1000
+    model = nothing
 end
 
+# CalOpts should be such that at any time before running callisto,
+# you can change any of the entries of CalOpts. That is, the constructor
+# should not enforce constraints between the fields. That is why
+# we do not instantiate the errors with a random vector of length
+# n, since if subsequently the graph is changed then the struct
+# would become inconsistent.
 
+function CalOpts(; topology = nothing, kw...)
+    c = Cal1Opts(; allowed_kws(Cal1Opts, kw)...)
+    if !isnothing(topology)
+        c.graph = Topology.Graph(topology)
+    end
+    return c
+end
 
 end

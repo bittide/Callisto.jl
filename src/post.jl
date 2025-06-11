@@ -23,8 +23,7 @@ end
 
 # things that take a long time we only apply to a time range
 function get_occ(c, theta, tmin, tmax)
-    model = make_model(c)
-    occ = [beta_piecewise(c, link, theta, tmin, tmax) for link in model.links]
+    occ = [beta_piecewise(c, link, theta, tmin, tmax) for link in c.links]
     return occ
 end
 

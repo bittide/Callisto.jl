@@ -1,9 +1,9 @@
 
 module Sim
 
-export callisto, make_model
+export callisto, compute_parameters, CalOpts
 
-import ..SimCore: SimCore, Link, Model, C1Opts
+import ..SimCore: SimCore, Link, Model, Cal1Opts
 import LogData: Log, log, start_new_record
 import Piecewise: PiecewiseLinear, evaluate_with_guess, extend_dx_dy, invert, invert_with_guess
 import StateSystems: next
@@ -11,6 +11,7 @@ import Topology: inport_indexed_from_edge_indexed
 
 using BittideTools
 using JuliaTools
+using Random
 
 
 ##############################################################################
@@ -174,15 +175,41 @@ function runcallisto(model::Model)
 end
 
 
+function make_ugn(beta0, gear, latency, theta0_at_src,  wm2_at_src, theta0_at_dst)
+    return beta0 - floor(gear*(theta0_at_src - latency * wm2_at_src)) + floor(gear*theta0_at_dst)
+end
 
-function make_model(c)
+
+
+function make_frequencies(seed, num_nodes)
+     rng = Random.Xoshiro(seed)
+     f = 1 .+  rand(rng, 1:10^5, num_nodes) *  1e-9
+     return f
+end
+
+
+function compute_parameters(c::Cal1Opts)
     n = c.graph.n
     m = c.graph.m
-    if isnothing(c.v)
-        v = C1Opts()
+    if c.errors == :random
+        errors = make_frequencies(1, c.graph.n)
     else
-        v = c.v
+        errors = c.errors
     end
+    latency = [ati(c.latency, e) for e = 1:m]
+
+    # beta0 is used to provide the measurement offsets
+    # and to make the ugns
+    if c.beta0 == :offset
+        beta0 = c.offset
+    else
+        beta0 = c.beta0
+    end
+    theta0 = [ati(c.theta0, i) for i = 1:n]
+    gears = [ati(c.gears, e) for e=1:m]
+    beta0 = [ati(beta0, e) for e=1:m]
+    offset = [ati(c.offset, e) for e=1:m]
+
     if c.enable_logging
         # todo add recommended log length
         slog = log_init(m)
@@ -194,64 +221,51 @@ function make_model(c)
     else
         checker = nothing
     end
-    errors = get_frequencies(c)
+
     if c.controller == :pi
         controller = [default_controller(i, c) for i=1:n]
     else
         controller = c.controller
     end
-    latencies = [ati(c.latency, e) for e = 1:m]
-    epoch = -10*maximum(latencies)
+    epoch = -10*maximum(latency)
     incoming = c.graph.incoming_edges
 
     wm2 = [initial_error(errors[i]) for i=1:n]
     wm1 = [initial_error(errors[i]) for i=1:n]
     wmin = 0.9 * c.base_freq
 
-    if v.beta0 == :offset
-        beta0 = c.offset
-    else
-        beta0 = v.beta0
-    end
-
-    theta0 = [ati(c.theta0, i) for i = 1:n]
-    gears = [ati(v.gears, e) for e=1:m]
-    beta0 = [ati(beta0, e) for e=1:m]
-    offset = [ati(c.offset, e) for e=1:m]
-
-    ugn = get_constant_ugn(c, beta0, errors; gears)
-
+    ugn =  [make_ugn(beta0[e], gears[e], latency[e], theta0[c.graph.edges[e].src],
+                        wm2[c.graph.edges[e].src], theta0[c.graph.edges[e].dst]) for e=1:m]
 
     links = [Link(e, c.graph.edges[e].src, c.graph.edges[e].dst,
-                 ugn[e], latencies[e], gears[e], beta0[e], offset[e]) for e in 1:m]
+                 ugn[e], latency[e], gears[e], beta0[e], offset[e]) for e in 1:m]
 
-    model = Model(;
+    c.model = Model(;
         slog,
         tmax = c.tmax,
         epoch,
         num_nodes = n,
         links, incoming,
         p = c.poll_period,
-        d = v.control_delay,
+        d = c.control_delay,
         errors,
-        theta0 = theta0,
-        wm2 ,
+        theta0,
+        wm2,
         wm1,
         wmin,
         stopper = c.stopper,
         controller,
         checker)
-    return model
 end
 
 
 function callisto(c)
     print("Running callisto: ")
 
-    model = make_model(c)
+    compute_parameters(c)
 
     # callisto cares about only the incoming edges to each node
-    @time simlog, theta = runcallisto(model)
+    @time simlog, theta = runcallisto(c.model)
 
     return (simlog = simlog, theta = theta,)
 end
