@@ -5,7 +5,7 @@ module Post
 export focused_callisto_info
 
 import Piecewise: after, before, delay
-import ..Sim: make_model
+
 
 ##############################################################################
 # For those who want all the details, use this

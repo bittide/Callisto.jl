@@ -17,9 +17,9 @@ module SimCore
 using Topology
 using JuliaTools
 using BittideTools
-import LogData: Log, log, start_new_record
+using LogData
 
-export Link, CalOpts, Cal1Opts, compute_parameters
+export Link, CalOpts, Cal1Opts, compute_parameters, log_init, log_occupancy
 
 const log_fields = (; tk=1, mocc=2)
 log_init(m) =  [Log(log_fields) for i=1:m]
@@ -65,6 +65,7 @@ Base.@kwdef mutable struct ComputedParams
     output_systems
     offset
     local_offsets
+    latency
 end
 
 
@@ -114,6 +115,7 @@ Base.@kwdef mutable struct Cal1Opts
     beta0 = 50
     gears = 1
     control_delay = 1000
+    # options below written to by simulator
     model = nothing
     computed = nothing
 end
@@ -227,7 +229,7 @@ function compute_parameters(c::Cal1Opts)
         stopper = c.stopper,
         controller,
         checker)
-    c.computed = ComputedParams(output_systems, offset, local_offsets)
+    c.computed = ComputedParams(output_systems, offset, local_offsets, latency)
 end
 
 
