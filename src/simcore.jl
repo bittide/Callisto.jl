@@ -24,8 +24,8 @@ export Link, CalOpts, Cal1Opts, compute_parameters, log_init, log_occupancy
 const log_fields = (; tk=1, mocc=2)
 log_init(m) =  [Log(log_fields) for i=1:m]
 @inline function log_occupancy(slog::Vector{Log}, eid, t, mocc)
-    log(slog[eid], log_fields.tk, t)
-    log(slog[eid], log_fields.mocc, mocc)
+    LogData.log(slog[eid], log_fields.tk, t)
+    LogData.log(slog[eid], log_fields.mocc, mocc)
     start_new_record(slog[eid])
 end
 @inline log_occupancy(slog::Nothing, eid, t, mocc) = return

@@ -52,9 +52,13 @@ function testcallisto(tmax,
     slog = nothing
     checker = nothing
     stopper = nothing
-    local_offset(i) = inport_indexed_from_edge_indexed(graph, offset, i)
-    controller = [ default_controller(i, graph, kp, ki, poll_period, base_freq,
-        local_offset(i)) for i=1:graph.n]
+
+    local_offsets = [inport_indexed_from_edge_indexed(graph, offset, i) for i=1:n]
+    output_systems = [OutputSystem(local_offsets[i]) for i=1:n]
+
+    controller = [composed_controller(i, graph, kp,
+        ki, poll_period, base_freq, output_systems[i]) for i=1:n]
+
 
     simlog, theta = callisto(slog, tmax, epoch, graph.n,
         links, graph.incoming_edges, poll_period, control_delay,
