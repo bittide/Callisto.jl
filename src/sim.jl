@@ -1,22 +1,28 @@
+# Copyright 2023 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 module Sim
 
-export callisto
-import ..SimCore: SimCore, Link, Model, Cal1Opts, compute_parameters, log_occupancy
-import Piecewise: PiecewiseLinear, evaluate_with_guess, extend_dx_dy, invert, invert_with_guess
-import StateSystems: next
-import Topology: inport_indexed_from_edge_indexed
-
+using ..SimCore
 using BittideTools
 using JuliaTools
+using Piecewise
 using Random
+using StateSystems
+using Topology
 
-
-##############################################################################
-
-
-
-##############################################################################
+export callisto
 
 @inline get_phase(theta::PiecewiseLinear, t::Float64, guess::Int) = evaluate_with_guess(theta, t, guess::Int)
 #
@@ -50,8 +56,6 @@ function Gx(i, theta, s, theta0, p, links, incoming, d, slog, measurement, guess
     # which would be equally good.
     # we know theta0[i] + k*p = theta_at_iofc - d
     physical_time_at_iom = invert_with_guess(theta[i], theta0[i] + k*p, guess2)
-
-    indegree = length(incoming[i])
     occ = measurement.occupancies
     for (j,e) in enumerate(incoming[i])
         link = links[e]
@@ -69,19 +73,6 @@ function initial_statex(i, epoch, freq_m2, freq_m1, theta0, d, slog)
     theta_values = Float64[theta0 + epoch * freq_m2,          theta0,            theta0 + d]
     theta_i = PiecewiseLinear(sample_times, theta_values)
     return theta_i
-end
-
-function check(d, p, w, n, tmax)
-    # I don't see any theoretical or practical reason
-    # for the restriction d < p, so this has been removed.
-    avgfreq = sum(w)/n
-    if avgfreq*tmax/p < 10
-        println("Warning; fewer than 10 steps per node in simulation")
-    end
-    relmadf = sum(abs.(w .- avgfreq))/avgfreq
-    if relmadf < 1e-9
-        println("Warning: frequencies are very close together. Expect strange behavior.")
-    end
 end
 
 function make_guesses(errors, num_nodes, links, d)
@@ -122,7 +113,7 @@ function callisto(slog, tmax, epoch, num_nodes, links, incoming, p, d, errors,
                   stopper,
                   controller, checker)
 
-    check(d, p, initial_error.(errors), num_nodes, tmax)
+    check_initial(p, initial_error.(errors), num_nodes, tmax)
     measurement = [Measurement(zeros(length(incoming[i]))) for i = 1:num_nodes]
     guess1, guess2 = make_guesses(errors, num_nodes, links, d)
     initial_state(i) = initial_statex(i, epoch, freq_m2[i], freq_m1[i], theta0[i], d, slog)
@@ -169,12 +160,8 @@ end
 
 function callisto(c)
     print("Running callisto: ")
-
     compute_parameters(c)
-
-    # callisto cares about only the incoming edges to each node
     @time simlog, theta = runcallisto(c.model)
-
     return (simlog = simlog, theta = theta,)
 end
 

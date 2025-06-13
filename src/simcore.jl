@@ -19,7 +19,7 @@ using JuliaTools
 using BittideTools
 using LogData
 
-export Link, CalOpts, Cal1Opts, compute_parameters, log_init, log_occupancy
+export Link, Model, CalOpts, Cal1Opts, compute_parameters, log_init, log_occupancy
 
 const log_fields = (; tk=1, mocc=2)
 log_init(m) =  [Log(log_fields) for i=1:m]
