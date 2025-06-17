@@ -69,8 +69,14 @@ end
 
 
 function initial_statex(i, epoch, freq_m2, freq_m1, theta0, d, slog)
-    sample_times = Float64[epoch,                             0,                 d/freq_m1]
-    theta_values = Float64[theta0 + epoch * freq_m2,          theta0,            theta0 + d]
+
+    sample_times = Float64[epoch,                             0]
+    theta_values = Float64[theta0 + epoch * freq_m2,          theta0]
+    if d > 0
+        push!(sample_times, d/freq_m1)
+        push!(theta_values, theta0 + d)
+    end
+
     theta_i = PiecewiseLinear(sample_times, theta_values)
     return theta_i
 end
@@ -159,7 +165,7 @@ end
 
 
 function callisto(c)
-    print("Running callisto: ")
+    print("Running callisto1: ")
     compute_parameters(c)
     @time simlog, theta = runcallisto(c.model)
     return (simlog = simlog, theta = theta,)

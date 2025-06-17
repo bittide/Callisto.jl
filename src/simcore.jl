@@ -18,6 +18,7 @@ using Topology
 using JuliaTools
 using BittideTools
 using LogData
+using StateSystems
 
 export Link, Model, CalOpts, Cal1Opts, compute_parameters, log_init, log_occupancy
 
@@ -66,6 +67,8 @@ Base.@kwdef mutable struct ComputedParams
     offset
     local_offsets
     latency
+    ugns::Any
+    gears::Any
 end
 
 
@@ -194,8 +197,7 @@ function compute_parameters(c::Cal1Opts)
     output_systems = [OutputSystem(local_offsets[i]) for i=1:n]
 
     if c.controller == :pi
-        controller = [composed_controller(i, c.graph, c.kp,
-            c.ki, c.poll_period, c.base_freq, output_systems[i]) for i=1:n]
+        controller = [compose(PIStateSystem(c.kp, c.ki * c.poll_period / c.base_freq), output_systems[i]) for i=1:n]
     else
         controller = c.controller
     end
@@ -206,11 +208,11 @@ function compute_parameters(c::Cal1Opts)
     wm1 = [initial_error(errors[i]) for i=1:n]
     wmin = 0.9 * c.base_freq
 
-    ugn =  [make_ugn(beta0[e], gears[e], latency[e], theta0[c.graph.edges[e].src],
+    ugns = [make_ugn(beta0[e], gears[e], latency[e], theta0[c.graph.edges[e].src],
                         wm2[c.graph.edges[e].src], theta0[c.graph.edges[e].dst]) for e=1:m]
 
     links = [Link(e, c.graph.edges[e].src, c.graph.edges[e].dst,
-                 ugn[e], latency[e], gears[e], beta0[e], offset[e]) for e in 1:m]
+                 ugns[e], latency[e], gears[e], beta0[e], offset[e]) for e in 1:m]
 
 
     c.model = Model(;
@@ -229,7 +231,7 @@ function compute_parameters(c::Cal1Opts)
         stopper = c.stopper,
         controller,
         checker)
-    c.computed = ComputedParams(output_systems, offset, local_offsets, latency)
+    c.computed = ComputedParams(output_systems, offset, local_offsets, latency, ugns, gears)
 end
 
 
