@@ -56,7 +56,7 @@ function testcallisto(tmax,
 
     local_offsets = [inport_indexed_from_edge_indexed(graph, offset, i) for i=1:n]
     output_systems = [OutputSystem(local_offsets[i]) for i=1:n]
-    controller = [compose(PIStateSystem(c.kp, c.ki * c.poll_period / c.base_freq), output_systems[i]) for i=1:n]
+    controller = [compose(PIStateSystem(kp, ki * poll_period / base_freq), output_systems[i]) for i=1:n]
 
 
     simlog, theta = callisto(slog, tmax, epoch, graph.n,
