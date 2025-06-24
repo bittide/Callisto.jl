@@ -114,6 +114,15 @@ function find_soonest_node(theta, n)
 end
 
 
+# We cannot have theta0 = 0. Because frames are popped from the elastic
+# buffer and sent when theta is 0,1,2,3,4.
+# The controller makes measurements and updates frequency when
+# theta is theta0 + k*poll_period
+# If theta0 is an integer then the controller is evaluating theta
+# at times when it an integer, and so it may evaluate it as k - epsilon
+# or k + epsilon. These cases are different, since in one case
+# a frame has been sent, and in the other it has not.
+#
 function callisto(slog, tmax, epoch, num_nodes, links, incoming, p, d, errors,
                   theta0, freq_m2, freq_m1, wmin,
                   stopper,
