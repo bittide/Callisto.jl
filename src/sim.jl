@@ -113,6 +113,18 @@ function find_soonest_node(theta, n)
     return minval, minind
 end
 
+function all_nodes_finished(theta, t)
+    for th in theta
+        if th.x[end] < t
+            return false
+        end
+    end
+    println("C1: all nodes finished")
+    # for th in theta
+    #     println("th.x[end] = ", th.x[end])
+    # end
+    return true
+end
 
 # We cannot have theta0 = 0. Because frames are popped from the elastic
 # buffer and sent when theta is 0,1,2,3,4.
@@ -135,7 +147,7 @@ function callisto(slog, tmax, epoch, num_nodes, links, incoming, p, d, errors,
     theta = [initial_state(i) for i=1:num_nodes]
     s = 0.0
     done = false
-    while s < tmax && !done
+    while (!all_nodes_finished(theta, tmax)) && !done
         #s, i  = findmin([theta[j].x[end] for j=1:num_nodes])
         s, i  = find_soonest_node(theta, num_nodes)
 

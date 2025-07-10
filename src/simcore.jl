@@ -95,8 +95,6 @@ Holds configuration options for a Callisto simulation.
 - `controller`:                 Specifies the controller type for each node.
                                 Can be `:pi` (default PI controller) or a vector of
                                 custom controller objects. Defaults to `:pi`.
-- `v`:                          Options specific to Callisto1 or Callisto2 features (e.g., link up/down behavior, prefill).
-
 
 """
 Base.@kwdef mutable struct Cal1Opts
