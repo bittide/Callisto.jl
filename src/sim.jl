@@ -24,20 +24,25 @@ using Topology
 
 export callisto
 
-@inline get_phase(theta::PiecewiseLinear, t::Float64, guess::Int) = evaluate_with_guess(theta, t, guess::Int)
-#
-@inline function  betax((;ugn, src, dst, latency, gear), t, theta, theta_at_iom, guess1)
-    phase1 = get_phase(theta[src], t - latency, guess1)
-    return ugn + floor(gear*phase1) - floor(gear*theta_at_iom)
-end
 
-@inline function get_measurement(link, physical_time_at_iom, theta, theta_at_iom, guess1)
-    return betax(link, physical_time_at_iom, theta, theta_at_iom, guess1)
+# two approaches to computing the physical time at iom
+# kk = (theta_at_ioc - d - theta0[i])/p
+# k = round(kk)
+#
+# Now we compute the physical time t at which the buffer occupancy is measured.
+# We could instead use the approach: physical_time_at_iom = invert(theta[i], theta[i].y[end] - d)
+# which would be equally good.
+# we know theta0[i] + k*p = theta_at_ioc - d
+#
+# physical_time_at_iom = invert_with_guess(theta[i], theta0[i] + k*p, guess2)
+
+@inline function get_occupancy((;ugn, src, dst, latency, gear), physical_time, theta, theta_at_dst, guess1)
+    theta_at_src_delayed_by_latency = evaluate_with_guess(theta[src], physical_time - latency, guess1)
+    return ugn + floor(gear*theta_at_src_delayed_by_latency) - floor(gear*theta_at_dst)
 end
-##############################################################################
 
 # measurement
-function Gx(i, theta, s, theta0, p, links, incoming, d, slog, measurement, guess1, guess2)
+function set_measurement_values(i, theta, links, incoming, d, slog, measurement, guess1, guess2)
     #
     # This means in particular that sampling always starts
     # off roughly in phase across all nodes. Perhaps we should have
@@ -48,35 +53,26 @@ function Gx(i, theta, s, theta0, p, links, incoming, d, slog, measurement, guess
     # must happen at physical time t =  d/omega[i]_{-1}
     #
     #
-    theta_at_iofc = theta[i].y[end]
-    theta_at_iom = theta_at_iofc - d
-    k = round((theta_at_iofc - d - theta0[i])/p)
-    # Now we compute the physical time t at which the buffer occupancy is measured.
-    # We could instead use the approach: physical_time_at_iom = invert(theta[i], theta[i].y[end] - d)
-    # which would be equally good.
-    # we know theta0[i] + k*p = theta_at_iofc - d
-    physical_time_at_iom = invert_with_guess(theta[i], theta0[i] + k*p, guess2)
-    occ = measurement.occupancies
+    theta_at_ioc = theta[i].y[end]
+    theta_at_iom = theta_at_ioc - d
+    physical_time_at_iom = invert_with_guess(theta[i], theta_at_iom, guess2)
     for (j,e) in enumerate(incoming[i])
-        link = links[e]
-        mm = get_measurement(link, physical_time_at_iom, theta, theta_at_iom, guess1)
-        occ[j] = mm # (mm - link.offset)/link.gear
+        mm = get_occupancy(links[e], physical_time_at_iom, theta, theta_at_iom, guess1)
+        measurement.occupancies[j] = mm
         log_occupancy(slog, e, physical_time_at_iom, mm)
     end
-    measurement.theta_at_iofc = theta_at_iofc
+    measurement.theta_at_ioc = theta_at_ioc
     measurement.physical_time_at_iom = physical_time_at_iom
 end
 
 
-function initial_statex(i, epoch, freq_m2, freq_m1, theta0, d, slog)
-
+function make_initial_state(i, epoch, freq_m2, freq_m1, theta0, d, slog)
     sample_times = Float64[epoch,                             0]
     theta_values = Float64[theta0 + epoch * freq_m2,          theta0]
     if d > 0
         push!(sample_times, d/freq_m1)
         push!(theta_values, theta0 + d)
     end
-
     theta_i = PiecewiseLinear(sample_times, theta_values)
     return theta_i
 end
@@ -100,7 +96,7 @@ function make_guesses(errors, num_nodes, links, d)
     return guess1, guess2
 end
 
-function find_soonest_node(theta, n)
+function find_node_whose_freq_changes_next(theta, n)
     minind = 1
     minval = theta[1].x[end]
     for i=2:n
@@ -120,9 +116,6 @@ function all_nodes_finished(theta, t)
         end
     end
     println("C1: all nodes finished")
-    # for th in theta
-    #     println("th.x[end] = ", th.x[end])
-    # end
     return true
 end
 
@@ -143,35 +136,28 @@ function callisto(slog, tmax, epoch, num_nodes, links, incoming, p, d, errors,
     check_initial(p, initial_error.(errors), num_nodes, tmax)
     measurement = [Measurement(zeros(length(incoming[i]))) for i = 1:num_nodes]
     guess1, guess2 = make_guesses(errors, num_nodes, links, d)
-    initial_state(i) = initial_statex(i, epoch, freq_m2[i], freq_m1[i], theta0[i], d, slog)
+    initial_state(i) = make_initial_state(i, epoch, freq_m2[i], freq_m1[i], theta0[i], d, slog)
     theta = [initial_state(i) for i=1:num_nodes]
-    s = 0.0
+    physical_time_of_next_freq_change = 0.0
     done = false
     while (!all_nodes_finished(theta, tmax)) && !done
-        #s, i  = findmin([theta[j].x[end] for j=1:num_nodes])
-        s, i  = find_soonest_node(theta, num_nodes)
+        # The following line is equivalent to
+        #   physical_time_of_next_freq_change, i  = findmin([theta[j].x[end] for j=1:num_nodes])
+        # but is a faster version
+        physical_time_of_next_freq_change, i = find_node_whose_freq_changes_next(theta, num_nodes)
 
-        Gx(i, theta, s, theta0, p,
-           links, incoming, d,
-           slog, measurement[i],
-           guess1, guess2)
-        #
-        # constants:        i, indegree
-        # immutable params: theta_at_iofc, physical_time_at_iom
-        # mutable refs:     occ_measurements
-        #
-        #measurements = (; occ_measurements, theta_at_iofc, physical_time_at_iom)
+        set_measurement_values(i, theta, links, incoming, d, slog, measurement[i], guess1, guess2)
         c::Float64 = next(controller[i], measurement[i])
 
         # If the error is constant, then ds = p / (c + e.const_error)
         # This is the physical time between the current control action
         # and the next one.
-        ds = local_to_realtime(errors[i], p, c, s, wmin)
-        if !check_freq_is_positive(checker, c, errors, i, s)
+        physical_duration_until_next_freq_change = local_to_realtime(errors[i], p, c, physical_time_of_next_freq_change, wmin)
+        if !check_freq_is_positive(checker, c, errors, i, physical_time_of_next_freq_change)
             break
         end
-        extend_dx_dy(theta[i], ds, p)
-        done = sim_is_done(stopper, errors, i, p, c, s)
+        extend_dx_dy(theta[i], physical_duration_until_next_freq_change, p)
+        done = sim_is_done(stopper, errors, i, p, c, physical_time_of_next_freq_change)
     end
     return slog, theta
 end
