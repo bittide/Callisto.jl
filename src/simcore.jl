@@ -20,7 +20,8 @@ using BittideTools
 using LogData
 using StateSystems
 
-export Link, Model, CalOpts, Cal1Opts, compute_parameters, log_init, log_occupancy
+export Cal1Opts, CalOpts, compute_parameters, get_gears, get_latency, get_output_systems,
+       get_ugns, Link, log_init, log_occupancy, Model
 
 const log_fields = (; tk=1, mocc=2)
 log_init(m) =  [Log(log_fields) for i=1:m]
@@ -67,8 +68,8 @@ Base.@kwdef mutable struct ComputedParams
     offset
     local_offsets
     latency
-    ugns::Any
-    gears::Any
+    ugns::Vector{Int64}
+    gears::Vector{Float64}
 end
 
 
@@ -137,6 +138,10 @@ end
 # Cal1Opts.
 #
 
+get_ugns(c::Cal1Opts) = c.computed.ugns
+get_latency(c::Cal1Opts) = c.computed.latency
+get_gears(c::Cal1Opts) = c.computed.gears
+get_output_systems(c::Cal1Opts) = c.computed.output_systems
 
 
 function CalOpts(; topology = nothing, kw...)
@@ -218,7 +223,8 @@ function compute_parameters(c::Cal1Opts)
         tmax = c.tmax,
         epoch,
         num_nodes = n,
-        links, incoming,
+        links,
+        incoming,
         p = c.poll_period,
         d = c.control_delay,
         errors,
