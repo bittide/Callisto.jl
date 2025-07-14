@@ -25,6 +25,7 @@ using Topology
 export callisto
 
 
+
 # two approaches to computing the physical time at iom
 # kk = (theta_at_ioc - d - theta0[i])/p
 # k = round(kk)
@@ -35,14 +36,15 @@ export callisto
 # we know theta0[i] + k*p = theta_at_ioc - d
 #
 # physical_time_at_iom = invert_with_guess(theta[i], theta0[i] + k*p, guess2)
-
-@inline function get_occupancy((;ugn, src, dst, latency, gear), physical_time, theta, theta_at_dst, guess1)
-    theta_at_src_delayed_by_latency = evaluate_with_guess(theta[src], physical_time - latency, guess1)
+#   (;ugn, src, dst, latency, gear)
+@inline function get_occupancy(physical_time, theta, theta_at_dst, ugn, edge, latency, gear, guess1)
+    theta_at_src_delayed_by_latency = evaluate_with_guess(theta[edge.src], physical_time - latency, guess1)
     return ugn + floor(gear*theta_at_src_delayed_by_latency) - floor(gear*theta_at_dst)
 end
 
 # measurement
-function set_measurement_values(i, theta, links, incoming, d, slog, measurement, guess1, guess2)
+function set_measurement_values(i, status)
+    # theta, incoming, d, slog, measurement, ugns, graph, latency, gears, guess1, guess2)
     #
     # This means in particular that sampling always starts
     # off roughly in phase across all nodes. Perhaps we should have
@@ -53,16 +55,17 @@ function set_measurement_values(i, theta, links, incoming, d, slog, measurement,
     # must happen at physical time t =  d/omega[i]_{-1}
     #
     #
-    theta_at_ioc = theta[i].y[end]
-    theta_at_iom = theta_at_ioc - d
-    physical_time_at_iom = invert_with_guess(theta[i], theta_at_iom, guess2)
-    for (j,e) in enumerate(incoming[i])
-        mm = get_occupancy(links[e], physical_time_at_iom, theta, theta_at_iom, guess1)
-        measurement.occupancies[j] = mm
-        log_occupancy(slog, e, physical_time_at_iom, mm)
+    theta_at_ioc = status.theta[i].y[end]
+    theta_at_iom = theta_at_ioc - status.model.d
+    physical_time_at_iom = invert_with_guess(status.theta[i], theta_at_iom, status.guess2)
+    for (j,e) in enumerate(status.model.graph.incoming_edges[i])
+        mm = get_occupancy(physical_time_at_iom, status.theta, theta_at_iom, status.model.ugns[e],
+            status.model.graph.edges[e], status.model.latency[e], status.model.gears[e], status.guess1)
+        status.measurement[i].occupancies[j] = mm
+        log_occupancy(status.model.slog, e, physical_time_at_iom, mm)
     end
-    measurement.theta_at_ioc = theta_at_ioc
-    measurement.physical_time_at_iom = physical_time_at_iom
+    status.measurement[i].theta_at_ioc = theta_at_ioc
+    status.measurement[i].physical_time_at_iom = physical_time_at_iom
 end
 
 
@@ -77,9 +80,9 @@ function make_initial_state(i, epoch, freq_m2, freq_m1, theta0, d, slog)
     return theta_i
 end
 
-function make_guesses(errors, num_nodes, links, d)
-    wavg = sum(initial_error.(errors)) / num_nodes
-    latency_min = minimum([l.latency for l in links])
+function make_guesses(errors, n, latency, d)
+    wavg = sum(initial_error.(errors)) / n
+    latency_min = minimum(latency)
     # The two values guess1 and guess2 are approximately how many ticks ago
     # we need to evaluate theta in order to compute buffer occupancy.
     # If we are wrong, it's better to be slighly too small.
@@ -96,7 +99,11 @@ function make_guesses(errors, num_nodes, links, d)
     return guess1, guess2
 end
 
-function find_node_whose_freq_changes_next(theta, n)
+function find_node_whose_freq_changes_next(theta)
+    # The following is equivalent to
+    #   physical_time_of_next_freq_change, i  = findmin([theta[j].x[end] for j=1:n])
+    # but is a faster version
+    n = length(theta)
     minind = 1
     minval = theta[1].x[end]
     for i=2:n
@@ -106,7 +113,9 @@ function find_node_whose_freq_changes_next(theta, n)
             minind = i
         end
     end
-    return minval, minind
+    # minval is the physical_time_of_next_freq_change
+    # minind is the node id
+    return Event(minind, minval)
 end
 
 function all_nodes_finished(theta, t)
@@ -119,6 +128,44 @@ function all_nodes_finished(theta, t)
     return true
 end
 
+
+function make_status(model::Model)
+    n = model.graph.n
+    incoming = model.graph.incoming_edges
+    measurement = [Measurement(zeros(length(incoming[i]))) for i = 1:n]
+    guess1, guess2 = make_guesses(model.errors, n, model.latency, model.d)
+    initial_state(i) = make_initial_state(i, model.epoch, model.wm2[i], model.wm1[i], model.theta0[i], model.d, model.slog)
+    theta = [initial_state(i) for i=1:n]
+    status = Status(; model, measurement, theta, guess1, guess2)
+    return status
+end
+
+function tick(status, i)
+    set_measurement_values(i, status)
+    c::Float64 = next(status.model.controller[i], status.measurement[i])
+    return c
+end
+
+# event.time is the physical time of next frequency change
+# event.node is the node id
+function update(event, status)
+    i = event.node
+    t = event.time
+    c::Float64 = tick(status, i)
+    # If the error is constant, then ds = p / (c + e.const_error)
+    # This is the physical time between the current control action
+    # and the next one.
+    #
+    # That is, how much physical time must pass, starting from time t,
+    # until the clock increases by p?
+    physical_duration_until_next_freq_change = local_to_realtime(status.model.errors[i], status.model.p, c,
+        t, status.model.wmin)
+    check_freq_is_positive(status.model.checker, c, status.model.errors, i, t)
+    extend_dx_dy(status.theta[i], physical_duration_until_next_freq_change, status.model.p)
+    done = sim_is_done(status.model.stopper, status.model.errors, i, status.model.p, c, t)
+    return done
+end
+
 # We cannot have theta0 = 0. Because frames are popped from the elastic
 # buffer and sent when theta is 0,1,2,3,4.
 # The controller makes measurements and updates frequency when
@@ -128,45 +175,31 @@ end
 # or k + epsilon. These cases are different, since in one case
 # a frame has been sent, and in the other it has not.
 #
-function callisto(slog, tmax, epoch, num_nodes, links, incoming, p, d, errors,
-                  theta0, freq_m2, freq_m1, wmin,
-                  stopper,
-                  controller, checker)
+# function callisto(slog, tmax, epoch, p, d, errors,
+#                   theta0, freq_m2, freq_m1, wmin,
+#                   stopper,
+#                   controller, checker, ugns, graph, latency, gears)
 
-    check_initial(p, initial_error.(errors), num_nodes, tmax)
-    measurement = [Measurement(zeros(length(incoming[i]))) for i = 1:num_nodes]
-    guess1, guess2 = make_guesses(errors, num_nodes, links, d)
-    initial_state(i) = make_initial_state(i, epoch, freq_m2[i], freq_m1[i], theta0[i], d, slog)
-    theta = [initial_state(i) for i=1:num_nodes]
-    physical_time_of_next_freq_change = 0.0
-    done = false
-    while (!all_nodes_finished(theta, tmax)) && !done
-        # The following line is equivalent to
-        #   physical_time_of_next_freq_change, i  = findmin([theta[j].x[end] for j=1:num_nodes])
-        # but is a faster version
-        physical_time_of_next_freq_change, i = find_node_whose_freq_changes_next(theta, num_nodes)
 
-        set_measurement_values(i, theta, links, incoming, d, slog, measurement[i], guess1, guess2)
-        c::Float64 = next(controller[i], measurement[i])
-
-        # If the error is constant, then ds = p / (c + e.const_error)
-        # This is the physical time between the current control action
-        # and the next one.
-        physical_duration_until_next_freq_change = local_to_realtime(errors[i], p, c, physical_time_of_next_freq_change, wmin)
-        if !check_freq_is_positive(checker, c, errors, i, physical_time_of_next_freq_change)
-            break
-        end
-        extend_dx_dy(theta[i], physical_duration_until_next_freq_change, p)
-        done = sim_is_done(stopper, errors, i, p, c, physical_time_of_next_freq_change)
-    end
-    return slog, theta
-end
 
 function runcallisto(model::Model)
-    return callisto(model.slog, model.tmax, model.epoch, model.num_nodes, model.links,
-        model.incoming, model.p, model.d, model.errors, model.theta0, model.wm2,
-        model.wm1, model.wmin, model.stopper, model.controller, model.checker)
+    n = model.graph.n
+    check_initial(model.p, initial_error.(model.errors), n, model.tmax)
+    status = make_status(model)
+    done = false
+    while (!all_nodes_finished(status.theta, status.model.tmax)) && !done
+        event = find_node_whose_freq_changes_next(status.theta)
+        done = update(event, status)
+    end
+    return model.slog, status.theta
 end
+
+# function runcallisto(model::Model)
+#     return callisto(model.slog, model.tmax, model.epoch,
+#         model.p, model.d, model.errors, model.theta0, model.wm2,
+#         model.wm1, model.wmin, model.stopper, model.controller, model.checker, model.ugns,
+#         model.graph, model.latency, model.gears)
+# end
 
 
 

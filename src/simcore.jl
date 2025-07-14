@@ -20,8 +20,9 @@ using BittideTools
 using LogData
 using StateSystems
 
-export Cal1Opts, CalOpts, compute_parameters, get_gears, get_latency, get_output_systems,
-       get_ugns, Link, log_init, log_occupancy, Model
+export Cal1Opts, CalOpts, compute_parameters, get_beta0,
+    get_gears, get_latency, get_offsets,
+    get_output_systems, get_ugns, Link, log_init, log_occupancy, Event, Model, Status
 
 const log_fields = (; tk=1, mocc=2)
 log_init(m) =  [Log(log_fields) for i=1:m]
@@ -33,24 +34,52 @@ end
 @inline log_occupancy(slog::Nothing, eid, t, mocc) = return
 
 
-mutable struct Link
-    id::Int64
-    src::Int64
-    dst::Int64
-    ugn::Int64
-    latency::Float64
-    gear::Float64
-    beta0::Int64
-    offset::Float64
-end
+# mutable struct Link
+#     id::Int64
+#     src::Int64
+#     dst::Int64
+#     ugn::Int64
+#     latency::Float64
+#     gear::Float64
+#     beta0::Int64
+#     offset::Float64
+# end
 
+
+
+
+"""
+    Model
+
+Holds the computed parameters for a Callisto simulation.
+
+Unlike `CalOpts`, which holds user-facing configuration, `Model` contains the
+parameters directly used by the simulator. It is typically created by the
+`compute_parameters` function from a `CalOpts` object.
+
+# Fields
+- `slog`: An optional vector of `Log` objects for recording buffer occupancy data for each edge.
+- `tmax`: The maximum simulation time.
+- `epoch`: A time before `t=0` used to initialize the simulation state, particularly the history of `theta`.
+- `p`: The polling period in local clock ticks between controller updates.
+- `d`: The control delay in local clock ticks between measurement and actuation.
+- `errors`: A vector of clock frequency error models for each node.
+- `theta0`: A vector of initial clock phases for each node at `t=0`.
+- `wm2`: A vector of initial frequencies for epoch < t < 0.
+- `wm1`: A vector of initial frequencies for 0 < t < s0, where s0 is the time when local clock = theta0 + d
+- `wmin`: The minimum allowed frequency, used to prevent division by zero in calculations.
+- `stopper`: An optional custom function or object that can terminate the simulation early.
+- `controller`: A vector of controller objects, one for each node, that determine frequency corrections.
+- `checker`: An optional `Checker` object to validate that clock frequencies remain positive.
+- `ugns`: A vector of integer offsets for each link used in the buffer occupancy calculation.
+- `graph`: The network topology as a `Topology.Graph` object.
+- `latency`: A vector of latencies for each link in the graph.
+- `gears`: A vector of gear ratios for each link, used in buffer occupancy calculations.
+"""
 Base.@kwdef mutable struct Model
     slog
     tmax
     epoch
-    num_nodes
-    links
-    incoming
     p
     d
     errors
@@ -61,6 +90,16 @@ Base.@kwdef mutable struct Model
     stopper
     controller
     checker
+    ugns
+    graph
+    latency
+    gears
+end
+
+
+struct Event
+    node::Int64
+    time::Float64
 end
 
 Base.@kwdef mutable struct ComputedParams
@@ -70,33 +109,47 @@ Base.@kwdef mutable struct ComputedParams
     latency
     ugns::Vector{Int64}
     gears::Vector{Float64}
+    beta0::Vector{Int64}
+end
+
+# status
+#
+# If nid is a node id, then measurement[nid] contains the occupancies
+# for all of the incoming edges at that node.
+#
+Base.@kwdef mutable struct Status
+    model::Model
+    measurement::Vector{Measurement}
+    theta
+    guess1::Int64
+    guess2::Int64
 end
 
 
-"""
-    CalOpts structure
-Holds configuration options for a Callisto simulation.
 
-# Fields
+"""
+    Cal1Opts structure
+Holds configuration options for a Callisto simulation.
+Fields
 - `graph`:                      The network topology. Defaults to a 3-node bidirectional triangle.
-- `latency`:                    Link latencies. Can be a scalar (applied to all links) or a vector. Defaults to 20.
-- `offset`:                     Initial buffer offsets/target occupancies. Can be a scalar or a vector. Defaults to 200.
-- `tmax`:                       Maximum simulation time. Defaults to 1.5e5.
-- `kp`:                         Proportional gain for the PI controller. Defaults to 8e-6.
-- `ki`:                         Integral gain for the PI controller. Defaults to 0.0.
-- `poll_period`:                Time between controller updates for each node. Defaults to 2000.
-- `theta0`:                     Initial phase for each node. Can be a scalar or a vector. Defaults to 0.0.
-- `errors`:                     Clock frequency errors for each node.
-                                Can be `:random` (generates random errors), a vector of numerical error values,
-                                or a vector of `SimCore.Error` objects. Defaults to `:random`.
+- `latency`:                    Link latencies. Can be a scalar (applied to all links) or a vector. Defaults to 5000.
+- `offset`:                     Initial buffer offsets/target occupancies. Can be a scalar or a vector, or `:beta0` to use `beta0`. Defaults to `:beta0`.
+- `tmax`:                       Maximum simulation time. Defaults to 1e9.
+- `kp`:                         Proportional gain for the PI controller. Defaults to 2e-8.
+- `ki`:                         Integral gain for the PI controller. Defaults to 1e-15.
+- `poll_period`:                Time between controller updates for each node. Defaults to 100000.
+- `theta0`:                     Initial phase for each node. Can be a scalar or a vector. Defaults to 0.1.
+- `errors`:                     Clock frequency errors for each node. Can be `:random` (generates random errors), a vector of numerical error values, or a vector of `SimCore.Error` objects. Defaults to `:random`.
 - `base_freq`:                  Base frequency used by the controller for scaling the integral term. Defaults to 1.0.
 - `stopper`:                    A custom stopping condition for the simulation. Defaults to `nothing` (no custom stopper).
 - `check_freq_is_positive`:     If `true`, checks if node frequencies become negative during simulation. Defaults to `true`.
 - `enable_logging`:             If `true`, enables logging of simulation data (e.g., buffer occupancies). Defaults to `true`.
-- `controller`:                 Specifies the controller type for each node.
-                                Can be `:pi` (default PI controller) or a vector of
-                                custom controller objects. Defaults to `:pi`.
-
+- `controller`:                 Specifies the controller type for each node. Can be `:pi` (default PI controller) or a vector of custom controller objects. Defaults to `:pi`.
+- `beta0`:                      The nominal value of beta, used by the UGN calculation. Can be a scalar or a vector. Defaults to 50.
+- `gears`:                      The gear ratio between the nominal phase increment of connected nodes. Can be a scalar or a vector. Defaults to 1.
+- `control_delay`:              The control delay in local clock ticks between measurement and actuation. Defaults to 1000.
+- `model`:                      Field written to by `compute_parameters` and used by the simulator.
+- `computed`:                   Field written to by `compute_parameters` but not used by the simulator.
 """
 Base.@kwdef mutable struct Cal1Opts
     graph = Topology.Graph(["triangle"]; bidirectional = true)
@@ -138,10 +191,17 @@ end
 # Cal1Opts.
 #
 
+######################################################################################
+# Functions for the user
 get_ugns(c::Cal1Opts) = c.computed.ugns
 get_latency(c::Cal1Opts) = c.computed.latency
 get_gears(c::Cal1Opts) = c.computed.gears
 get_output_systems(c::Cal1Opts) = c.computed.output_systems
+get_offsets(c::Cal1Opts) = c.computed.offset
+get_beta0(c::Cal1Opts) = c.computed.beta0
+
+###########################################################################################
+
 
 
 function CalOpts(; topology = nothing, kw...)
@@ -205,7 +265,6 @@ function compute_parameters(c::Cal1Opts)
         controller = c.controller
     end
     epoch = -10*maximum(latency)
-    incoming = c.graph.incoming_edges
 
     wm2 = [initial_error(errors[i]) for i=1:n]
     wm1 = [initial_error(errors[i]) for i=1:n]
@@ -214,17 +273,14 @@ function compute_parameters(c::Cal1Opts)
     ugns = [make_ugn(beta0[e], gears[e], latency[e], theta0[c.graph.edges[e].src],
                         wm2[c.graph.edges[e].src], theta0[c.graph.edges[e].dst]) for e=1:m]
 
-    links = [Link(e, c.graph.edges[e].src, c.graph.edges[e].dst,
-                 ugns[e], latency[e], gears[e], beta0[e], offset[e]) for e in 1:m]
+    # links = [Link(e, c.graph.edges[e].src, c.graph.edges[e].dst,
+    #              ugns[e], latency[e], gears[e], beta0[e], offset[e]) for e in 1:m]
 
 
     c.model = Model(;
         slog,
         tmax = c.tmax,
         epoch,
-        num_nodes = n,
-        links,
-        incoming,
         p = c.poll_period,
         d = c.control_delay,
         errors,
@@ -234,8 +290,13 @@ function compute_parameters(c::Cal1Opts)
         wmin,
         stopper = c.stopper,
         controller,
-        checker)
-    c.computed = ComputedParams(output_systems, offset, local_offsets, latency, ugns, gears)
+        checker,
+        ugns,
+        graph = c.graph,
+        latency,
+        gears)
+    c.computed = ComputedParams(output_systems, offset, local_offsets, latency,
+        ugns, gears, beta0)
 end
 
 

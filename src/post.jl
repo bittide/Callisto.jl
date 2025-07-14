@@ -19,10 +19,42 @@
 """
 module Post
 
+using Piecewise
 
-export focused_callisto_info
+export focused_callisto_info, get_occupancy, get_occupancies, get_sampled_occupancies
 
 import Piecewise: after, before, delay
+import ..SimCore: get_latency, get_ugns, get_gears, Cal1Opts
+
+#
+# these functions depend on the sim results (i.e, theta)
+# and so they are here instead of in simcore.
+#
+function get_occupancies(c::Cal1Opts, theta, t::Number)
+    latency = get_latency(c)
+    gears = get_gears(c)
+    ugns = get_ugns(c)
+    return [get_occupancy(ugns[e], c.graph.edges[e], latency[e], gears[e], theta, t) for e = 1:c.graph.m]
+end
+
+function get_sampled_occupancies(c::Cal1Opts, theta, tlist::Vector)
+    occupancies_plus_times = Array{Samples, 1}(undef, c.graph.m)
+    for e = 1:c.graph.m
+        occupancies = [get_occupancy(c, theta, t, e) for t in tlist]
+        occupancies_plus_times[e] = Samples(tlist, occupancies)
+    end
+    return occupancies_plus_times
+end
+
+get_occupancy(ugn, edge, latency, gear, theta, t) = ugn + floor(gear*theta[edge.src](t - latency)) - floor(gear*theta[edge.dst](t))
+
+function get_occupancy(c, theta, t, e)
+    latency = get_latency(c)
+    gears = get_gears(c)
+    ugns = get_ugns(c)
+    return get_occupancy(ugns[e], c.graph.edges[e], latency[e], gears[e], theta, t)
+end
+
 
 
 ##############################################################################
@@ -30,18 +62,21 @@ import Piecewise: after, before, delay
 
 # buffer at node i associated with link to node j
 # find occupancy as a piecewise constant function
-function beta_piecewise(c, link, theta, tmin, tmax)
-    thj1 = delay(theta[link.src], link.latency)
+function beta_piecewise(edge, latency, ugn, gear, theta, tmin, tmax)
+    thj1 = delay(theta[edge.src], latency)
     thj = before(after(thj1, tmin), tmax)
-    thi = before(after(theta[link.dst], tmin), tmax)
-    p = floor(link.gear*thj) - floor(link.gear*thi)
-    return p + link.ugn
+    thi = before(after(theta[edge.dst], tmin), tmax)
+    p = floor(gear*thj) - floor(gear*thi)
+    return p + ugn
 end
 
 
 # things that take a long time we only apply to a time range
 function get_occ(c, theta, tmin, tmax)
-    occ = [beta_piecewise(c, link, theta, tmin, tmax) for link in c.model.links]
+    latency = get_latency(c)
+    ugns = get_ugns(c)
+    gears = get_gears(c)
+    occ = [beta_piecewise(c.graph.edges[e], latency[e], ugns[e], gears[e], theta, tmin, tmax) for e = 1:c.graph.m]
     return occ
 end
 
