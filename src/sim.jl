@@ -36,7 +36,6 @@ export callisto
 # we know theta0[i] + k*p = theta_at_ioc - d
 #
 # physical_time_at_iom = invert_with_guess(theta[i], theta0[i] + k*p, guess2)
-#   (;ugn, src, dst, latency, gear)
 @inline function get_occupancy(physical_time, theta, theta_at_dst, ugn, edge, latency, gear, guess1)
     theta_at_src_delayed_by_latency = evaluate_with_guess(theta[edge.src], physical_time - latency, guess1)
     return ugn + floor(gear*theta_at_src_delayed_by_latency) - floor(gear*theta_at_dst)
@@ -44,8 +43,6 @@ end
 
 # measurement
 function set_measurement_values(i, status)
-    # theta, incoming, d, slog, measurement, ugns, graph, latency, gears, guess1, guess2)
-    #
     # This means in particular that sampling always starts
     # off roughly in phase across all nodes. Perhaps we should have
     # an option where we can test different initial phasing.
@@ -101,21 +98,19 @@ end
 
 function find_node_whose_freq_changes_next(theta)
     # The following is equivalent to
-    #   physical_time_of_next_freq_change, i  = findmin([theta[j].x[end] for j=1:n])
+    #   minimizing_physical_time, minimizing_nodeid  = findmin([theta[j].x[end] for j=1:n])
     # but is a faster version
     n = length(theta)
-    minind = 1
-    minval = theta[1].x[end]
+    minimizing_nodeid = 1
+    minimizing_physical_time = theta[1].x[end]
     for i=2:n
-        s = theta[i].x[end]
-        if s < minval
-            minval = s
-            minind = i
+        t = theta[i].x[end]
+        if t < minimizing_physical_time
+            minimizing_physical_time = t
+            minimizing_nodeid = i
         end
     end
-    # minval is the physical_time_of_next_freq_change
-    # minind is the node id
-    return Event(minind, minval)
+    return Event(minimizing_nodeid, minimizing_physical_time)
 end
 
 function all_nodes_finished(theta, t)
@@ -128,8 +123,7 @@ function all_nodes_finished(theta, t)
     return true
 end
 
-
-function make_status(model::Model)
+function make_initial_status(model::Model)
     n = model.graph.n
     incoming = model.graph.incoming_edges
     measurement = [Measurement(zeros(length(incoming[i]))) for i = 1:n]
@@ -153,11 +147,8 @@ function update(event, status)
     t = event.time
     c::Float64 = tick(status, i)
     # If the error is constant, then ds = p / (c + e.const_error)
-    # This is the physical time between the current control action
-    # and the next one.
-    #
-    # That is, how much physical time must pass, starting from time t,
-    # until the clock increases by p?
+    # This is the physical time between the current control action and the next one.
+    # That is, how much physical time must pass, starting from time t, until the clock increases by p?
     physical_duration_until_next_freq_change = local_to_realtime(status.model.errors[i], status.model.p, c,
         t, status.model.wmin)
     check_freq_is_positive(status.model.checker, c, status.model.errors, i, t)
@@ -174,18 +165,14 @@ end
 # at times when it an integer, and so it may evaluate it as k - epsilon
 # or k + epsilon. These cases are different, since in one case
 # a frame has been sent, and in the other it has not.
-#
-# function callisto(slog, tmax, epoch, p, d, errors,
-#                   theta0, freq_m2, freq_m1, wmin,
-#                   stopper,
-#                   controller, checker, ugns, graph, latency, gears)
+
 
 
 
 function runcallisto(model::Model)
     n = model.graph.n
     check_initial(model.p, initial_error.(model.errors), n, model.tmax)
-    status = make_status(model)
+    status = make_initial_status(model)
     done = false
     while (!all_nodes_finished(status.theta, status.model.tmax)) && !done
         event = find_node_whose_freq_changes_next(status.theta)
@@ -193,16 +180,6 @@ function runcallisto(model::Model)
     end
     return model.slog, status.theta
 end
-
-# function runcallisto(model::Model)
-#     return callisto(model.slog, model.tmax, model.epoch,
-#         model.p, model.d, model.errors, model.theta0, model.wm2,
-#         model.wm1, model.wmin, model.stopper, model.controller, model.checker, model.ugns,
-#         model.graph, model.latency, model.gears)
-# end
-
-
-
 
 function callisto(c)
     print("Running callisto1: ")

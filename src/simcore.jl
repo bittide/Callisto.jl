@@ -34,20 +34,6 @@ end
 @inline log_occupancy(slog::Nothing, eid, t, mocc) = return
 
 
-# mutable struct Link
-#     id::Int64
-#     src::Int64
-#     dst::Int64
-#     ugn::Int64
-#     latency::Float64
-#     gear::Float64
-#     beta0::Int64
-#     offset::Float64
-# end
-
-
-
-
 """
     Model
 
@@ -112,11 +98,29 @@ Base.@kwdef mutable struct ComputedParams
     beta0::Vector{Int64}
 end
 
-# status
-#
-# If nid is a node id, then measurement[nid] contains the occupancies
-# for all of the incoming edges at that node.
-#
+"""
+    Status
+
+Holds the dynamic state of a Callisto simulation.
+
+State variables of the simulation.
+Initialized by `make_status` and then passed through the simulation loop,
+where it is updated at each simulation event.
+
+# Fields
+- `model::Model`: The static parameters of the simulation model.
+- `measurement::Vector{Measurement}`: A vector where `measurement[i]` holds the most
+  recent measurement data for node `i`. This includes buffer occupancies for all
+  incoming edges, the local clock value at the instance of control (`theta_at_ioc`),
+  and the physical time of measurement (`physical_time_at_iom`).
+- `theta`: A vector of `PiecewiseLinear` functions, where `theta[i]` represents the
+  local clock `theta` of node `i` as a function of physical time.
+- `guess1::Int64`: An integer value used as a heuristic to speed up the evaluation
+  of `theta` when computing buffer occupancies. It provides an initial guess for
+  look-behind time.
+- `guess2::Int64`: Another integer guess, similar to `guess1`, used to accelerate
+  the inversion of `theta` functions.
+"""
 Base.@kwdef mutable struct Status
     model::Model
     measurement::Vector{Measurement}
@@ -124,8 +128,6 @@ Base.@kwdef mutable struct Status
     guess1::Int64
     guess2::Int64
 end
-
-
 
 """
     Cal1Opts structure
@@ -150,6 +152,16 @@ Fields
 - `control_delay`:              The control delay in local clock ticks between measurement and actuation. Defaults to 1000.
 - `model`:                      Field written to by `compute_parameters` and used by the simulator.
 - `computed`:                   Field written to by `compute_parameters` but not used by the simulator.
+
+CalOpts is such that at any time before running callisto,  you can change any of the entries of CalOpts.
+That is, the constructor should not enforce constraints between the fields. That is why
+we do not instantiate the errors with a random vector of length n, since if subsequently
+the graph is changed then the struct would become inconsistent.
+
+Most fields are parameters are to be set by the user. The `computed` and `model` fields are
+set by the simulator or initializer.
+
+Dependencies of Callisto, like BittideTools, cannot access Cal1Opts.
 """
 Base.@kwdef mutable struct Cal1Opts
     graph = Topology.Graph(["triangle"]; bidirectional = true)
@@ -175,22 +187,6 @@ Base.@kwdef mutable struct Cal1Opts
     computed = nothing
 end
 
-# CalOpts should be such that at any time before running callisto,
-# you can change any of the entries of CalOpts. That is, the constructor
-# should not enforce constraints between the fields. That is why
-# we do not instantiate the errors with a random vector of length
-# n, since if subsequently the graph is changed then the struct
-# would become inconsistent.
-#
-# Another viewpoint. Some parameters are set by the user
-# and some are set by the simulator.
-# No parameters should be set by both
-#
-#
-# Also, dependencies of Callisto, like BittideTools, cannot access
-# Cal1Opts.
-#
-
 ######################################################################################
 # Functions for the user
 get_ugns(c::Cal1Opts) = c.computed.ugns
@@ -199,10 +195,7 @@ get_gears(c::Cal1Opts) = c.computed.gears
 get_output_systems(c::Cal1Opts) = c.computed.output_systems
 get_offsets(c::Cal1Opts) = c.computed.offset
 get_beta0(c::Cal1Opts) = c.computed.beta0
-
 ###########################################################################################
-
-
 
 function CalOpts(; topology = nothing, kw...)
     c = Cal1Opts(; allowed_kws(Cal1Opts, kw)...)
@@ -212,7 +205,6 @@ function CalOpts(; topology = nothing, kw...)
     compute_parameters(c)
     return c
 end
-
 
 function make_ugn(beta0, gear, latency, theta0_at_src,  wm2_at_src, theta0_at_dst)
     return beta0 - floor(gear*(theta0_at_src - latency * wm2_at_src)) + floor(gear*theta0_at_dst)
@@ -228,27 +220,25 @@ function compute_parameters(c::Cal1Opts)
     end
     latency = [ati(c.latency, e) for e = 1:m]
 
-    # beta0 is used to provide the measurement offsets
-    # and to make the ugns
+    # beta0 is used to provide the measurement offsets and to make the ugns
     if c.offset == :beta0
         offset = c.beta0
     else
         offset = c.offset
     end
 
-    beta0 = c.beta0
-
     theta0 = [ati(c.theta0, i) for i = 1:n]
     gears = [ati(c.gears, e) for e=1:m]
-    beta0 = [ati(beta0, e) for e=1:m]
+    beta0 = [ati(c.beta0, e) for e=1:m]
     offset = [ati(offset, e) for e=1:m]
 
     if c.enable_logging
-        # todo add recommended log length
+        # TODO: add recommended log length
         slog = log_init(m)
     else
         slog = nothing
     end
+
     if c.check_freq_is_positive
         checker = Checker()
     else
@@ -256,7 +246,6 @@ function compute_parameters(c::Cal1Opts)
     end
 
     local_offsets = [inport_indexed_from_edge_indexed(c.graph, offset, i) for i=1:n]
-
     output_systems = [OutputSystem(local_offsets[i]) for i=1:n]
 
     if c.controller == :pi
@@ -272,10 +261,6 @@ function compute_parameters(c::Cal1Opts)
 
     ugns = [make_ugn(beta0[e], gears[e], latency[e], theta0[c.graph.edges[e].src],
                         wm2[c.graph.edges[e].src], theta0[c.graph.edges[e].dst]) for e=1:m]
-
-    # links = [Link(e, c.graph.edges[e].src, c.graph.edges[e].dst,
-    #              ugns[e], latency[e], gears[e], beta0[e], offset[e]) for e in 1:m]
-
 
     c.model = Model(;
         slog,
@@ -295,8 +280,8 @@ function compute_parameters(c::Cal1Opts)
         graph = c.graph,
         latency,
         gears)
-    c.computed = ComputedParams(output_systems, offset, local_offsets, latency,
-        ugns, gears, beta0)
+
+    c.computed = ComputedParams(output_systems, offset, local_offsets, latency, ugns, gears, beta0)
 end
 
 
