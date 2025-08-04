@@ -15,6 +15,7 @@
 module Sim
 
 using ..SimCore
+using ..Frames
 using BittideTools
 using JuliaTools
 using Piecewise
@@ -135,6 +136,8 @@ function make_initial_status(model::Model)
 end
 
 function tick(status, i)
+    frame_mechanism(status.model.framemover, status, i)
+
     set_measurement_values(i, status)
     c::Float64 = next(status.model.controller[i], status.measurement[i])
     return c

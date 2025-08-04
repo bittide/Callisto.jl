@@ -19,10 +19,13 @@ using JuliaTools
 using BittideTools
 using LogData
 using StateSystems
+using DataStructures
 
 export Cal1Opts, CalOpts, compute_parameters, get_beta0,
     get_gears, get_latency, get_offsets,
     get_output_systems, get_ugns, Link, log_init, log_occupancy, Event, Model, Status
+
+export Frame, FrameMover, make_framemover
 
 const log_fields = (; tk=1, mocc=2)
 log_init(m) =  [Log(log_fields) for i=1:m]
@@ -32,6 +35,25 @@ log_init(m) =  [Log(log_fields) for i=1:m]
     start_new_record(slog[eid])
 end
 @inline log_occupancy(slog::Nothing, eid, t, mocc) = return
+
+
+
+
+struct Frame
+    send_tick::UInt64
+    data::UInt64
+end
+
+struct FrameMover
+    fifos::Vector{DataStructures.CircularBuffer{Frame}}
+end
+
+function make_framemover(m)
+    fifos = [DataStructures.CircularBuffer{Frame}(100) for e = 1:m]
+    return FrameMover(fifos)
+end
+
+
 
 
 """
@@ -80,6 +102,8 @@ Base.@kwdef mutable struct Model
     graph
     latency
     gears
+    framemover
+    framedataprocessor
 end
 
 
@@ -182,6 +206,8 @@ Base.@kwdef mutable struct Cal1Opts
     beta0 = 50
     gears = 1
     control_delay = 1000
+    framemover = nothing
+    framedataprocessor = nothing
     # options below written to by simulator
     model = nothing
     computed = nothing
@@ -262,6 +288,15 @@ function compute_parameters(c::Cal1Opts)
     ugns = [make_ugn(beta0[e], gears[e], latency[e], theta0[c.graph.edges[e].src],
                         wm2[c.graph.edges[e].src], theta0[c.graph.edges[e].dst]) for e=1:m]
 
+
+    if c.framemover == :fifo
+        framemover = make_framemover(c.graph.m)
+    elseif isnothing(c.framemover)
+        framemover = nothing
+    else
+        framemover = c.framemover
+    end
+
     c.model = Model(;
         slog,
         tmax = c.tmax,
@@ -279,7 +314,9 @@ function compute_parameters(c::Cal1Opts)
         ugns,
         graph = c.graph,
         latency,
-        gears)
+        gears,
+        framemover,
+        framedataprocessor = c.framedataprocessor)
 
     c.computed = ComputedParams(output_systems, offset, local_offsets, latency, ugns, gears, beta0)
 end

@@ -4,6 +4,8 @@ module Callisto
 include("simcore.jl")
 using .SimCore
 
+include("frames.jl")
+using .Frames
 
 # depends on SimCore, LogData, and Piecewise
 include("sim.jl")
