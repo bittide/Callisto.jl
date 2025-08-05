@@ -4,111 +4,97 @@ using ..SimCore
 using Topology
 
 
-export frame_mechanism, received_data, process_step, data_to_send
+export frame_mechanism, write_popped_data_to_processor_memory, step_processor_one_cycle, read_data_from_processor_memory
 
 
 frame_mechanism(framemover::Nothing, status, i) = return
 
-# Function calls:
-#  Controller -> vmtick -> receive_data -> checkfifo -> received_data
-#                       -> send_data -> data_to_send
-#
-# Dataflow:
-#  data_to_send -> send_data -> vmtick -> receive_data -> checkfifo -> received_data
-#
-#
 
-#  send_data gets data from data_to_send and puts it in a frame on the fifo
-#  data_to_send(fs, i, port, localtick) returns a UInt64
-#
-#  check_fifo gets a frame out of the fifo and gives the data field to received_data
-#  received_data(fs, i, port, localtick, data::UInt64)  returns nothing
-#
-#  So Callisto needs a FIFO. The frame type can be (localtick, data)
-#  It's optional in C1, and built in to C2.
-#
+"""
+    frame_mechanism(framemover::FrameMover, status, i)
 
-# TODO: refactor this to bring the loops into this function
-# and to separate the checkfifo function  from the received_data function
-# so that checkfifo returns a status and we call received_data
-# from here.
+Simulates one cycle of the data plane for a given node `i`.
+
+This function orchestrates the movement and processing of data frames for a single
+localtick. It performs three main actions in sequence:
+1.  **Receive**: It inspects the FIFOs for all incoming edges of node `i`.
+    - It discards any frames that are older than the UGN time.
+    - If a frame's arrival time (`send_tick + ugn`) matches the current
+      `localtick`, it is popped from its FIFO and its data is written to the
+      node's processor memory.
+2.  **Process**: It signals the node's `framedataprocessor` (e.g., an Elara
+    core model) to execute a single computation cycle.
+3.  **Send**: It queries the `framedataprocessor` for data to be sent on each
+    outgoing edge. A new `Frame` is created with this data, timestamped with
+    the current `localtick`, and pushed into the corresponding outgoing FIFO.
+
+# Arguments
+- `framemover::FrameMover`: A struct containing the network's FIFOs.
+- `status`: The overall simulation status, providing access to the model
+   graph, UGN values, processor, and the node's local time (`theta`).
+- `i`: The index of the node to be processed.
+"""
 function frame_mechanism(framemover::FrameMover, status, i)
     fdp = status.model.framedataprocessor
+    graph = status.model.graph
+    fifos = framemover.fifos
+    ugns = status.model.ugns
     localtick = UInt64(floor(status.theta[i].y[end]))
 
     # get data out of Fifo and give it to fdp (ie Elara)
-    receive_data(framemover, status, i, localtick)
+    for e in graph.incoming_edges[i]
+        check_and_remove_old_frames(fifos[e], ugns[e], localtick)
+        if first_frame_arrived(fifos[e], ugns[e], localtick)
+            data::UInt64 = popfirst!(fifos[e]).data
+            port = inportid_from_edgeid(graph, i, e)
+            # send data to Elara processor
+            write_popped_data_to_processor_memory(fdp, i, port, localtick, data)
+        end
+    end
 
     # do compute step
-    process_step(fdp, i, localtick)
+    step_processor_one_cycle(fdp, i, localtick)
 
     # get data from compute and put it onto the link
-    send_data(framemover, status, i, localtick)
+    for e in graph.outgoing_edges[i]
+        port = outportid_from_edgeid(graph, i, e)
+        # call Elara to get data from core/memory
+        data::UInt64 = read_data_from_processor_memory(fdp, i, port, localtick)
+        push!(framemover.fifos[e], Frame(localtick, data))
+        # append to end of fifo
+    end
 end
 
-function clearfifo(fifo, ugn, localtick)
+function remove_old_frames(fifo, ugn, localtick)
     j = findlast(a ->  a[1] + ugn <= localtick, fifo)
     for k=1:j-1
         popfirst!(fifo)
     end
 end
 
-function receive_data(framemover::FrameMover, status, i, localtick)
-    fdp = status.model.framedataprocessor
-    graph = status.model.graph
-    for e in graph.incoming_edges[i]
-        port = inportid_from_edgeid(graph, i, e)
-        fifo = framemover.fifos[e]
-        if length(fifo) > 0
-            ugn = status.model.ugns[e]
-            #
-            # checkfifo will pop the top frame from the fifo
-            # and call received_data to handle it
-            checkfifo(fdp, fifo, ugn, i, port, localtick)
-        end
-    end
-end
-
-
-function checkfifo(fdp, fifo, ugn, i, port, localtick)
-    # remove frames that have arrived before now
-    if fifo[1].send_tick + ugn < localtick
-        clearfifo(fifo, ugn, localtick)
-    end
-    if isempty(fifo)
+function check_and_remove_old_frames(fifo, ugn, localtick)
+    if length(fifo) == 0
         return
     end
-    # get the current frame and receive it's data
-    if fifo[1].send_tick + ugn == localtick
-        data = popfirst!(fifo).data
-        received_data(fdp,i, port, localtick, data)
+    if fifo[1].send_tick + ugn < localtick
+        remove_old_frames(fifo, ugn, localtick)
     end
 end
 
-function send_data(framemover::FrameMover, status, i, localtick)
-    fdp = status.model.framedataprocessor
-    graph = status.model.graph
-    for e in graph.outgoing_edges[i]
-        port = outportid_from_edgeid(graph, i, e)
-        #
-        # data_to_send is another Elara entrypoint.
-        # It gets the data from memory so that Callisto
-        # can put it into the fifo. Here data is a UInt64.
-        #
-        data = data_to_send(fdp, i, port, localtick)
-        push!(framemover.fifos[e], Frame(localtick, data))  # append to end of fifo
+function first_frame_arrived(fifo, ugn, localtick)
+    if isempty(fifo)
+        return false
     end
+    if fifo[1].send_tick + ugn != localtick
+        return false
+    end
+    return true
 end
 
-received_data(fdp::Nothing, i, port, localtick, data) = return
-process_step(fdp::Nothing, i, localtick) = return
-data_to_send(fdp::Nothing, i, port, localtick) = return
-
-
-
-
+write_popped_data_to_processor_memory(fdp::Nothing, i, port, localtick, data) = return
+step_processor_one_cycle(fdp::Nothing, i, localtick) = return
+read_data_from_processor_memory(fdp::Nothing, i, port, localtick)::UInt64 = 0x0
 
 
 
 end
-
