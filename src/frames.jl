@@ -2,9 +2,10 @@ module Frames
 
 using ..SimCore
 using Topology
+using BittideTools
 
 
-export frame_mechanism, write_popped_data_to_processor_memory, step_processor_one_cycle, read_data_from_processor_memory
+export frame_mechanism
 
 
 frame_mechanism(framemover::Nothing, status, i) = return
@@ -90,10 +91,6 @@ function first_frame_arrived(fifo, ugn, localtick)
     end
     return true
 end
-
-write_popped_data_to_processor_memory(fdp::Nothing, i, port, localtick, data) = return
-step_processor_one_cycle(fdp::Nothing, i, localtick) = return
-read_data_from_processor_memory(fdp::Nothing, i, port, localtick)::UInt64 = 0x0
 
 
 
