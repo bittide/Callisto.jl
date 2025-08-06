@@ -1,23 +1,10 @@
 
 module Run
 
-##############################################################################
+
 using Callisto
-##############################################################################
-
 using PlotKit
-const pk = PlotKit
-
-plotpath(x) = joinpath(ENV["HOME"], "plots/", x)
-callistox(c) = parse_callisto_logx(c, callisto(c)...)
-
-
-pzip(a) = Point.(a)
-tzip(a::Series) = pzip(tuples(a))
-tzip(a::Array)  = pzip.(tuples.(a))
-
-plot(p, f; kwargs...) = save(drawplot(tzip(p) ; kwargs...), f)
-save(d, fn) =  pk.save(d, plotpath(fn), 4)
+using StandardPlots
 
 
 
@@ -37,3 +24,7 @@ end
 
 
 end
+
+
+using JuliaTools
+@vrun()

@@ -1,10 +1,21 @@
 name = "Callisto"
-authors = ["Sanjay Lall <sanjaylall@google.com>"]
 uuid = "4ae4e7f3-3a0d-47fd-9705-768e0f1baff0"
-version = "0.1.0"
+authors = ["Sanjay Lall <sanjaylall@google.com>"]
+version = "0.2.0"
 
 [deps]
-LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+BittideTools = "85b144e0-61cd-438c-96cd-1dba1e5a087d"
+Topology = "52998691-69e7-4a84-99f6-e58d9ccf8a6d"
+StateSystems = "23c40dd2-0d34-4c38-b89d-e68691bb192b"
+LogData = "dc9b759f-4b6f-4c6b-8af8-223bef96c6ca"
+Piecewise = "f155f5a3-add7-4ef4-a5de-701ac9c64b07"
+JuliaTools = "25bd99f7-d62a-43e8-a0d1-199798cd3f46"
+DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
+
+
+
+
+
 
 

@@ -1,0 +1,11 @@
+name: 'Install Julia package'
+description: 'Install the JuliaTools package'
+author: 'Sanjay Lall'
+
+runs:
+  using: 'composite'
+  steps:
+  - run: julia --color=yes -e 'using Pkg; Pkg.add(url="https://github.com/bittide/JuliaTools.jl")'
+    shell: bash
+
+

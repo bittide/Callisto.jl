@@ -1,174 +1,92 @@
+# Copyright 2023 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
+
+"""
+   The module Post provides the function `focused_callisto_info` which
+   provides the exact buffer occupancy as a function of time.
+"""
 module Post
 
+using Piecewise
 
-export parse_callisto_log, parse_callisto_logx, focused_callisto_info, get_freq
-export getlatency, getlambda, getbeta, getomega, getdata
+export focused_callisto_info, get_occupancy, get_occupancies, get_sampled_occupancies
 
-import ..SimCore:    beta, gamma
-import ..LogData:    make_tuples, get_records
-import ..Piecewise:  PiecewiseConstant, Samples, delay, after, before, PiecewiseLinear
+import Piecewise: after, before, delay
+import ..SimCore: get_latency, get_ugns, get_gears, Cal1Opts
 
-
-function get_freq(c, Tdata)
-    n = c.graph.n
-    freq = PiecewiseConstant[]
-    for i=1:n
-        X = get_records(Tdata, x -> x.nid == i)
-        fq = [a.freq for a in X]
-        sk = [a.sk for a in X]
-        push!(freq, PiecewiseConstant(sk, fq[1:end-1]))
-    end
-    return freq
+#
+# these functions depend on the sim results (i.e, theta)
+# and so they are here instead of in simcore.
+#
+function get_occupancies(c::Cal1Opts, theta, t::Number)
+    latency = get_latency(c)
+    gears = get_gears(c)
+    ugns = get_ugns(c)
+    return [get_occupancy(ugns[e], c.graph.edges[e], latency[e], gears[e], theta, t) for e = 1:c.graph.m]
 end
 
-function get_occ_samples(c, theta, times)
-    # construct occupancies at measurement times
-    n = c.graph.n
-    m = c.graph.m
-    occ = Array{Union{Missing,Samples}, 1}(missing, m)
-    for e = 1:m
-        src, dst = c.graph.edges[e]
-        mo = zeros(length(times))
-        for r = 1:length(times)
-            t = times[r]
-            mo[r] =  beta(dst, src, e, t, theta, c.ugn, c.latency, c.gears)
-        end
-        occ[e] = Samples(times, mo)
+function get_sampled_occupancies(c::Cal1Opts, theta, tlist::Vector)
+    occupancies_plus_times = Array{Samples, 1}(undef, c.graph.m)
+    for e = 1:c.graph.m
+        occupancies = [get_occupancy(c, theta, t, e) for t in tlist]
+        occupancies_plus_times[e] = Samples(tlist, occupancies)
     end
-    return occ
+    return occupancies_plus_times
 end
 
-function parse_callisto_log(c, Tdata, theta)
-    p = c.poll_period
-    d = c.control_delay
-    n = c.graph.n
-    m = c.graph.m
+get_occupancy(ugn, edge, latency, gear, theta, t) = ugn + floor(gear*theta[edge.src](t - latency)) - floor(gear*theta[edge.dst](t))
 
-    meas = Samples[]
-    for i=1:n
-        X = get_records(Tdata, x -> x.nid == i)
-        mdata = [a.meas for a in X]
-        tk = [a.tk for a in X]
-        sam = Samples(tk[3:end], mdata[3:end])
-        push!(meas, sam)
-    end
-
-    # at time tk the controller state
-    # changes from xi(k) to xi(k+1)
-    xi = PiecewiseConstant[]
-    for i=1:n
-        X = get_records(Tdata, x -> x.nid == i)
-        xdata = [a.xi for a in X]
-        tk = [a.tk for a in X]
-        #cs = PiecewiseConstant(tk[3:end], xdata[3:end-1])
-        cs = PiecewiseConstant(tk[3:end], xdata[4:end])
-        push!(xi, cs)
-    end
-
-
-    # construct occupancies at measurement times
-    mocc = Array{Union{Missing,Samples}, 1}(missing, m)
-    for link in c.links
-        tk = meas[link.dst].x
-        mo = [beta(link, t, theta) for t in tk]
-        mocc[link.id] = Samples(tk, mo)
-    end
-    return meas, xi, mocc
+function get_occupancy(c, theta, t, e)
+    latency = get_latency(c)
+    gears = get_gears(c)
+    ugns = get_ugns(c)
+    return get_occupancy(ugns[e], c.graph.edges[e], latency[e], gears[e], theta, t)
 end
 
 
-function parse_callisto_logx(c, simlog, theta)
-    Tdata = make_tuples(simlog)
-    freq = get_freq(c, Tdata)
-    meas, xi, mocc = parse_callisto_log(c, Tdata, theta)
-    adjusted_freqs = [ 10^9*(f + (-1)) for f in freq]
 
-    return (simlog=simlog, theta=theta, freq=freq, meas=meas,
-            afreq=adjusted_freqs, xi=xi, mocc=mocc)
+##############################################################################
+# For those who want all the details, use this
+
+# buffer at node i associated with link to node j
+# find occupancy as a piecewise constant function
+function beta_piecewise(edge, latency, ugn, gear, theta, tmin, tmax)
+    thj1 = delay(theta[edge.src], latency)
+    thj = before(after(thj1, tmin), tmax)
+    thi = before(after(theta[edge.dst], tmin), tmax)
+    p = floor(gear*thj) - floor(gear*thi)
+    return p + ugn
 end
 
 
 # things that take a long time we only apply to a time range
 function get_occ(c, theta, tmin, tmax)
-    occ = [beta_piecewise(c, link, theta, tmin, tmax) for link in c.links]
+    latency = get_latency(c)
+    ugns = get_ugns(c)
+    gears = get_gears(c)
+    occ = [beta_piecewise(c.graph.edges[e], latency[e], ugns[e], gears[e], theta, tmin, tmax) for e = 1:c.graph.m]
     return occ
 end
 
-function get_delta(c, theta)
-    delta = Array{Union{Missing, PiecewiseLinear}, 2}(missing, n, n)
-    for i=1:n
-        for j in c.graph.adjacent_nodes[i]
-            delta[i,j] = delay(theta[j], c.latency[i,j]) - theta[i] + c.ugn[i,j]
-        end
-    end
-    return delta
-end
-
-
-# buffer at node i associated with link to node j
-# find occupancy as a piecewise constant function
-function beta_piecewise(c, link, theta, tmin, tmax)
-    thj1 = delay(theta[link.src], link.latency)
-    thj = before(after(thj1, tmin), tmax)
-    thi = before(after(theta[link.dst], tmin), tmax)
-    p = floor(link.gear*thj) - floor(link.gear*thi)
-    return p + link.ugn
-end
-
-function get_adjusted_theta(c, theta,  tmin, tmax)
-    n = c.graph.n
-    proj(x) = before(after(x, tmin),tmax)
-    adj_freq = minimum( (theta[i](tmax) - theta[i](tmin)) / (tmax-tmin) for i = 1:n)
-    adj_freq = adj_freq - 0.1/(tmax-tmin)
-    epoch = -3*maximum([a.latency for a in c.links])
-    adj_theta = PiecewiseLinear[]
-    for i=1:n
-        rateadj = PiecewiseLinear([epoch, tmax],[epoch*adj_freq, tmax*adj_freq])
-        ath = proj(theta[i]) - rateadj
-        ath = ath - floor(theta[i](tmin))
-        push!(adj_theta, ath)
-    end
-    return adj_theta
-end
 
 function focused_callisto_info(c, xc, tmin, tmax)
     occ = get_occ(c, xc.theta, tmin, tmax)
-    adj_theta = get_adjusted_theta(c, xc.theta, tmin, tmax)
-    fc = (occ = occ, adj_theta = adj_theta)
+    fc = (occ = occ, )
     return fc
 end
 
-
-
-getlatency(c) = [l.latency for l in c.links]
-getlambda(c) = [l.ugn for l in c.links]
-getomega(t, xc) = [f(t) for f in xc.freq]
-getbeta(t, c, xc) = [beta(l, t, xc.theta) for l in c.links]
-getgamma(t, c, xc) = [gamma(l, t, xc.theta) for l in c.links]
-
-function getbsdz(c)
-    B = c.graph.incidence
-    S = Int.(B .> 0)
-    D = Int.(B .< 0)
-    Z = c.graph.fundamental_cycles
-    return B, S, D, Z
-end
-
-function getdata(t, c, xc)
-    B, S, D, Z = getbsdz(c)
-    d = (c = c, xc = xc, t = t,
-         B = B, S = S, D = D, Z = Z,
-         lambda = getlambda(c),
-         latency = getlatency(c),
-         beta0  = getbeta(0, c, xc),
-         gamma0 = getgamma(0, c, xc),
-         omega0 = getomega(0, xc),
-         beta   = getbeta(t, c, xc),
-         gamma  = getgamma(t, c, xc),
-         omega  = getomega(t, xc))
-    return d
-end
 
 
 end
