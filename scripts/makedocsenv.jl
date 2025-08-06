@@ -23,7 +23,7 @@ end
 
 
 function main()
-    working_dir = joinpath(pwd(), "working")
+    working_dir = pwd()
     package_dir = pwd()
     local_package_repos = deps_for_callisto()
     build_and_test_package(working_dir, package_dir, local_package_repos; runtest = false, envdir = "docs", revert_environment = false)
