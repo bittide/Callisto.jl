@@ -21,21 +21,19 @@ end
 
 
 
-function build_and_test(; dotest = "true")
-    runtest = true
-    if dotest != "true"
-        runtest = false
-    end
-    println("Received argument: dotest = ", dotest)
+function main()
     working_dir = joinpath(pwd(), "working")
     package_dir = pwd()
     local_package_repos = deps_for_callisto()
-    build_and_test_package(working_dir, package_dir, local_package_repos; runtest)
+    build_and_test_package(working_dir, package_dir, local_package_repos)
 end
 
 
 end
 
+
+using .Build
+Build.main()
 
 
 

@@ -1,0 +1,19 @@
+name: 'Run Julia script'
+description: 'Run a Julia script'
+author: 'Sanjay Lall'
+
+inputs:
+  project:
+    description: 'Passed to the --project flag.'
+    default: '@.'
+  script:
+    description: 'Path of script.'
+    default: '@.'
+
+runs:
+  using: 'composite'
+  steps:
+  - run: julia --color=yes scripts/makedocsenv.jl
+    shell: bash
+
+
