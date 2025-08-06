@@ -19,22 +19,18 @@ function deps_for_callisto()
     return local_package_repos
 end
 
-function get_test_arg()
-    if !("INPUT_RUNTEST" in keys(ENV))
-        return true
-    end
-    rt = ENV["INPUT_RUNTEST"]
-    if rt == "true"
-        return true
-    end
-    return false
-end
 
-function build_and_test()
+
+function build_and_test(; dotest = "true")
+    runtest = true
+    if dotest != "true"
+        runtest = false
+    end
+    println("Received argument: dotest = ", dotest)
     working_dir = joinpath(pwd(), "working")
     package_dir = pwd()
     local_package_repos = deps_for_callisto()
-    build_and_test_package(working_dir, package_dir, local_package_repos; runtest  = get_test_arg())
+    build_and_test_package(working_dir, package_dir, local_package_repos; runtest)
 end
 
 

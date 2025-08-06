@@ -20,7 +20,7 @@ jobs:
       - uses: ./.github/actions/juliatools
       - uses: ./.github/actions/juliarun
         with:
-          runtest: 'false'
+          dotest: 'false'
       #        run: julia --project=docs/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
       - name: Build and deploy
         env:
