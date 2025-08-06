@@ -17,7 +17,7 @@ inputs:
 runs:
   using: 'composite'
   steps:
-  - run: julia --color=yes -e 'include("scripts/build.jl"); using .Build; Build.build_and_test(dotest = ${{inputs.dotest}}") '
+  - run: julia --color=yes -e 'include("scripts/build.jl"); using .Build; Build.build_and_test(dotest = ${{inputs.dotest}}) '
     shell: bash
 
 
