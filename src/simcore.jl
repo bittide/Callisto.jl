@@ -202,12 +202,12 @@ Base.@kwdef mutable struct Cal1Opts
     check_freq_is_positive = true
     enable_logging = true
     controller = :pi
+    framedataprocessor = nothing
     # options below only used for callisto 1
     beta0 = 50
     gears = 1
     control_delay = 1000
     framemover = nothing
-    framedataprocessor = nothing
     # options below written to by simulator
     model = nothing
     computed = nothing
