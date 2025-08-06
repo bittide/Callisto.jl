@@ -35,34 +35,31 @@ function testcallisto(tmax,
     wm2 = copy(errors)
     wm1 = copy(errors)
     beta0 = fill(50, m)
-    latency = 5000
-    gear = 1
+    latency = fill(5000, m)
+    gears = fill(1, m)
     offset = fill(50, m)
 
-    function make_link(e)
-        src = graph.edges[e].src
-        dst = graph.edges[e].dst
-        ugn = make_ugn(beta0[e], gear, latency, theta0[src], wm2[src], theta0[dst])
-        return Link(e, src, dst, ugn, latency, gear, beta0[e], offset[e])
-    end
+    ugns = [make_ugn(beta0[e], gears[e], latency[e], theta0[graph.edges[e].src],
+                wm2[graph.edges[e].src], theta0[graph.edges[e].dst]) for e in 1:m]
 
-    links = [make_link(e) for e = 1:m]
     wmin = 0.1
-    epoch = -10*latency
+    epoch = -10*maximum(latency)
     control_delay = 1000
     slog = nothing
     checker = nothing
     stopper = nothing
+    framemover = nothing
+    framedataprocessor = nothing
 
     local_offsets = [inport_indexed_from_edge_indexed(graph, offset, i) for i=1:n]
     output_systems = [OutputSystem(local_offsets[i]) for i=1:n]
     controller = [compose(PIStateSystem(kp, ki * poll_period / base_freq), output_systems[i]) for i=1:n]
 
+    model = Model(; slog, tmax, epoch, p = poll_period,
+        d = control_delay, errors, theta0, wm2, wm1, wmin, stopper, controller,
+        checker, ugns, graph, latency, gears, framemover, framedataprocessor)
 
-    simlog, theta = callisto(slog, tmax, epoch, graph.n,
-        links, graph.incoming_edges, poll_period, control_delay,
-        errors, theta0, wm2, wm1, wmin, stopper,
-        controller, checker)
+    simlog, theta = runcallisto(model)
 
     return theta
 end

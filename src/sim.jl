@@ -23,7 +23,7 @@ using Random
 using StateSystems
 using Topology
 
-export callisto
+export callisto, runcallisto
 
 
 
@@ -171,7 +171,7 @@ end
 
 
 
-
+# MARK: runcallisto
 function runcallisto(model::Model)
     n = model.graph.n
     check_initial(model.p, initial_error.(model.errors), n, model.tmax)
