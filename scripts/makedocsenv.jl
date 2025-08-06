@@ -33,6 +33,10 @@ end
 
 end
 
+using .MakeDocsEnv
+MakeDocsEnv.main()
+
+
 
 
 
